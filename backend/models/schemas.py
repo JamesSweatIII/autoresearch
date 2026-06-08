@@ -37,10 +37,12 @@ class DocumentResponse(BaseModel):
     keywords: List[str]
     relevance_score: float
     sentiment: str
+    sentiment_scores: Dict = {}
     topic_cluster: str
     source_type: str = "sample"
     url: str = ""
     paper_id: Optional[int] = None
+    llm_verified: bool = False
 
 
 class PipelineStatus(BaseModel):

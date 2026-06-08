@@ -123,6 +123,9 @@ export default function PaperDetail() {
                       {p.authors && (
                         <p className="text-xs text-gray-500 mt-0.5">{p.authors}</p>
                       )}
+                      {p.abstract && (
+                        <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{p.abstract}</p>
+                      )}
                     </div>
                     {p.similarity_score != null && (
                       <span className="shrink-0 text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded">

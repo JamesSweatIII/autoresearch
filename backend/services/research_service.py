@@ -1,10 +1,16 @@
 import json
 import random
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from collections import Counter
 import re
 import math
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
 
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -13,8 +19,50 @@ try:
 except ImportError:
     SKLEARN_AVAILABLE = False
 
+# ── Multi-analyzer sentiment ───────────────────────────────
+try:
+    from textblob import TextBlob
+    TEXTBLOB_AVAILABLE = True
+except ImportError:
+    TEXTBLOB_AVAILABLE = False
+
+try:
+    from nltk.corpus import opinion_lexicon
+    _lexicon_pos = set(opinion_lexicon.positive())
+    _lexicon_neg = set(opinion_lexicon.negative())
+    LEXICON_AVAILABLE = True
+except ImportError:
+    LEXICON_AVAILABLE = False
+
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 SAMPLE_PATH = DATA_DIR / "sample_documents.json"
+BING_LEXICON_PATH = DATA_DIR / "salex_bing.csv"
+
+# Load Bing Liu lexicon from local CSV (more complete than NLTK corpus)
+_bing_pos = set()
+_bing_neg = set()
+if BING_LEXICON_PATH.exists():
+    with open(BING_LEXICON_PATH) as f:
+        lines = f.readlines()
+    for line in lines[1:]:  # skip header
+        parts = line.strip().split(",")
+        if len(parts) >= 4:
+            word = parts[0].strip().lower()
+            sent = int(parts[3])
+            if word:
+                if sent == 1:
+                    _bing_pos.add(word)
+                elif sent == -1:
+                    _bing_neg.add(word)
+    # Merge with NLTK lexicon if available
+    if LEXICON_AVAILABLE:
+        _bing_pos |= _lexicon_pos
+        _bing_neg |= _lexicon_neg
+    LEXICON_AVAILABLE = True
+    print(f"[AutoResearch] Loaded {len(_bing_pos)} positive + {len(_bing_neg)} negative sentiment words")
+elif LEXICON_AVAILABLE:
+    _bing_pos = _lexicon_pos
+    _bing_neg = _lexicon_neg
 
 
 def load_sample_documents() -> List[Dict]:
@@ -22,49 +70,15 @@ def load_sample_documents() -> List[Dict]:
         return json.load(f)
 
 
-def filter_documents_by_topic(docs: List[Dict], topic: str, threshold: float = 0.05) -> List[Dict]:
+def filter_documents_by_topic(docs: List[Dict], topic: str) -> List[Dict]:
     if not docs:
         return []
 
-    texts = []
-    for doc in docs:
-        parts = [
-            doc.get("title", ""),
-            doc.get("abstract", ""),
-            " ".join(doc.get("keywords", []) if isinstance(doc.get("keywords"), list) else []),
-        ]
-        texts.append(" ".join(p for p in parts if p))
+    abstracts = [d.get("abstract", "") for d in docs]
+    titles = [d.get("title", "") for d in docs]
 
-    if SKLEARN_AVAILABLE and len(texts) > 1:
-        try:
-            vectorizer = TfidfVectorizer(
-                max_features=2000,
-                stop_words="english",
-                ngram_range=(1, 3),
-                sublinear_tf=True,
-            )
-            all_texts = [topic] + texts
-            tfidf = vectorizer.fit_transform(all_texts)
-            sims = cosine_similarity(tfidf[0:1], tfidf[1:]).flatten()
-
-            scored = [
-                (float(sim), doc)
-                for sim, doc in zip(sims, docs)
-            ]
-            scored.sort(key=lambda x: -x[0])
-            return [doc for _, doc in scored]
-        except Exception:
-            pass
-
-    topic_lower = topic.lower()
-    topic_terms = set(topic_lower.split())
-    scored = []
-    for doc in docs:
-        text = (doc.get("title", "") + " " + doc.get("abstract", "") + " " +
-                " ".join(doc.get("keywords", []))).lower()
-        score = sum(1 for t in topic_terms if t in text)
-        if score > 0:
-            scored.append((score, doc))
+    scores = compute_multi_signal_relevance(abstracts, titles, topic)
+    scored = list(zip(scores, docs))
     scored.sort(key=lambda x: -x[0])
     return [doc for _, doc in scored]
 
@@ -128,6 +142,170 @@ def batch_compute_relevance(texts: List[str], topic: str) -> List[float]:
         except Exception:
             pass
     return [compute_relevance(t, topic) for t in texts]
+
+
+# ── BM25 Okapi ─────────────────────────────────────────
+def _bm25_tokenize(text: str) -> List[str]:
+    return re.findall(r"[a-zA-Z][a-zA-Z\-']{2,}", text.lower())
+
+
+def _bm25_score(
+    query_terms: List[str],
+    doc_terms: List[str],
+    doc_len: int,
+    avg_doc_len: float,
+    n_docs: int,
+    doc_freq: Dict[str, int],
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> float:
+    score = 0.0
+    for qt in query_terms:
+        if qt not in doc_freq or doc_freq[qt] == 0:
+            continue
+        tf = doc_terms.count(qt)
+        if tf == 0:
+            continue
+        idf = math.log((n_docs - doc_freq[qt] + 0.5) / (doc_freq[qt] + 0.5) + 1.0)
+        tf_norm = tf * (k1 + 1) / (tf + k1 * (1 - b + b * doc_len / avg_doc_len))
+        score += idf * tf_norm
+    return score
+
+
+def compute_bm25_scores(
+    query: str,
+    corpus: List[str],
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> List[float]:
+    if not corpus:
+        return []
+    query_terms = _bm25_tokenize(query)
+    if not query_terms:
+        return [0.0] * len(corpus)
+
+    tokenized_docs = [_bm25_tokenize(d) for d in corpus]
+    doc_lengths = [float(len(t)) for t in tokenized_docs]
+    avg_doc_len = sum(doc_lengths) / len(doc_lengths) if doc_lengths else 1.0
+    n_docs = len(corpus)
+
+    doc_freq = {}
+    for qt in query_terms:
+        doc_freq[qt] = sum(1 for doc_tokens in tokenized_docs if qt in doc_tokens)
+
+    scores = []
+    for i, doc_tokens in enumerate(tokenized_docs):
+        s = _bm25_score(
+            query_terms, doc_tokens, doc_lengths[i],
+            avg_doc_len, n_docs, doc_freq, k1, b,
+        )
+        scores.append(s)
+
+    if NUMPY_AVAILABLE:
+        scores_arr = np.array(scores)
+        if scores_arr.max() > scores_arr.min():
+            scores_arr = (scores_arr - scores_arr.min()) / (scores_arr.max() - scores_arr.min())
+        elif scores_arr.max() > 0:
+            scores_arr = scores_arr / scores_arr.max()
+        return scores_arr.tolist()
+
+    # Pure Python fallback min-max normalize
+    mn, mx = min(scores), max(scores)
+    if mx > mn:
+        return [(s - mn) / (mx - mn) for s in scores]
+    if mx > 0:
+        return [s / mx for s in scores]
+    return scores
+
+
+def _parse_quoted_phrases(topic: str) -> Tuple[List[str], str]:
+    phrases = re.findall(r'"([^"]+)"', topic)
+    rest = re.sub(r'"[^"]+"', "", topic).strip()
+    return phrases, rest
+
+
+def _extract_topic_ngrams(topic: str, max_n: int = 3) -> set:
+    words = topic.lower().split()
+    ngrams = set()
+    for n in range(1, min(max_n + 1, len(words) + 1)):
+        for i in range(len(words) - n + 1):
+            ngrams.add(" ".join(words[i:i+n]))
+    ngrams.discard("")
+    return ngrams
+
+
+def compute_multi_signal_relevance(
+    abstracts: List[str],
+    titles: List[str],
+    topic: str,
+) -> List[float]:
+    n = len(abstracts)
+    if n == 0:
+        return []
+
+    quoted_phrases, unquoted_topic = _parse_quoted_phrases(topic)
+    topic_ngrams = _extract_topic_ngrams(unquoted_topic)
+    for phrase in quoted_phrases:
+        topic_ngrams.add(phrase.lower())
+
+    # Required unquoted unigrams — doc must contain most of these
+    _stop_words = {"the","a","an","and","or","but","in","on","at","to","for",
+                   "of","with","by","from","as","is","was","are","were","be",
+                   "this","that","it","its","they","them","not","no","so","if",
+                   "just","about","also","been","each","some","such","only",
+                   "other","more","most","much","many","into","over","after",
+                   "before","between","through","during","because","using"}
+    required_unigrams = [
+        w for w in unquoted_topic.lower().split()
+        if w not in _stop_words and len(w) > 2
+    ]
+
+    combined_texts = [a + " " + t for a, t in zip(abstracts, titles)]
+
+    # 1. BM25 Okapi ranking
+    bm25_scores = compute_bm25_scores(topic, combined_texts, k1=1.5, b=0.75)
+
+    # Compute IDF weights for each topic n-gram across the document set
+    all_texts = [a.lower() + " " + t.lower() for a, t in zip(abstracts, titles)]
+    idf_weights = {}
+    for ng in topic_ngrams:
+        doc_count = sum(1 for text in all_texts if ng in text)
+        idf_weights[ng] = math.log((n + 1) / (doc_count + 1)) + 1
+        if ng.lower() in [p.lower() for p in quoted_phrases]:
+            idf_weights[ng] *= 5
+
+    quoted_lower = [p.lower() for p in quoted_phrases]
+
+    def _coverage_ratio(text_lower: str) -> float:
+        if not required_unigrams:
+            return 1.0
+        present = sum(1 for w in required_unigrams if w in text_lower)
+        return present / len(required_unigrams)
+
+    def _weighted_overlap(text: str) -> float:
+        if not topic_ngrams:
+            return 0.0
+        text_lower = text.lower()
+        if quoted_lower and not any(p in text_lower for p in quoted_lower):
+            return 0.0
+        match_weight = sum(idf_weights.get(ng, 1) for ng in topic_ngrams if ng in text_lower)
+        max_weight = sum(idf_weights.values())
+        base = match_weight / max_weight if max_weight > 0 else 0.0
+        return base * _coverage_ratio(text_lower)
+
+    scores = []
+    for i in range(n):
+        abs_overlap = _weighted_overlap(abstracts[i])
+        title_overlap = _weighted_overlap(titles[i])
+
+        combined = (
+            bm25_scores[i] * 0.50 +
+            abs_overlap * 0.25 +
+            title_overlap * 0.25
+        )
+        scores.append(min(1.0, max(0.0, combined)))
+
+    return scores
 
 
 def generate_summary(docs: List[Dict], keywords: List[str], topic: str) -> str:
@@ -248,28 +426,61 @@ def rank_sources(docs: List[Dict]) -> List[Dict]:
     return rankings
 
 
+def analyze_sentiment_textblob(text: str) -> Tuple[str, float]:
+    if TEXTBLOB_AVAILABLE:
+        try:
+            blob = TextBlob(text)
+            polarity = blob.sentiment.polarity
+            if polarity >= 0.25:
+                return "positive", polarity
+            elif polarity <= -0.25:
+                return "negative", polarity
+            return "neutral", polarity
+        except Exception:
+            pass
+    return "neutral", 0.0
+
+
+def analyze_sentiment_lexicon(text: str) -> Tuple[str, float]:
+    if LEXICON_AVAILABLE:
+        try:
+            words = re.findall(r"[a-zA-Z][a-zA-Z\-']{2,}", text.lower())
+            pos_count = sum(1 for w in words if w in _bing_pos)
+            neg_count = sum(1 for w in words if w in _bing_neg)
+            total = pos_count + neg_count
+            if total == 0:
+                return "neutral", 0.0
+            score = (pos_count - neg_count) / total
+            if score >= 0.3:
+                return "positive", score
+            elif score <= -0.3:
+                return "negative", score
+            return "neutral", score
+        except Exception:
+            pass
+    return "neutral", 0.0
+
+
 def analyze_sentiment(text: str) -> str:
-    strong_positive = {
-        "breakthrough", "outperform", "outperforms", "outperformed",
-        "state-of-the-art", "state of the art", "revolutionary",
-        "exceptional", "landmark", "superior", "cutting-edge",
-        "highly effective", "remarkable", "milestone",
+    return analyze_sentiment_multi(text)["combined"]
+
+
+def analyze_sentiment_multi(text: str) -> Dict[str, any]:
+    tb_label, tb_score = analyze_sentiment_textblob(text)
+    lex_label, lex_score = analyze_sentiment_lexicon(text)
+
+    if tb_label == lex_label:
+        combined_label = tb_label
+    else:
+        tb_magnitude = abs(tb_score)
+        lex_magnitude = abs(lex_score)
+        combined_label = tb_label if tb_magnitude >= lex_magnitude else lex_label
+
+    return {
+        "combined": combined_label,
+        "textblob": {"label": tb_label, "score": round(tb_score, 4)},
+        "lexicon": {"label": lex_label, "score": round(lex_score, 4)},
     }
-    strong_negative = {
-        "fail", "fails", "failed", "failure", "failures",
-        "harmful", "overfit", "overfitting", "bias", "biased",
-        "degrade", "degradation", "inaccurate", "incorrect",
-        "poor performance", "low accuracy", "unstable",
-        "erroneous", "meaningless", "worse than", "underperform",
-    }
-    text_lower = text.lower()
-    pos_count = sum(1 for w in strong_positive if w in text_lower or w.replace("-", " ") in text_lower)
-    neg_count = sum(1 for w in strong_negative if w in text_lower)
-    if pos_count >= 2 and pos_count > neg_count:
-        return "positive"
-    if neg_count >= 2 and neg_count > pos_count:
-        return "negative"
-    return "neutral"
 
 
 def find_similar_papers(target_id: int, all_papers: List[Dict], top_n: int = 5) -> List[Dict]:

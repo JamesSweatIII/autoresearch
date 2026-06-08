@@ -23,12 +23,13 @@ except ImportError:
 from database.setup import get_session, ResearchJob, Document, Paper, init_db
 from services.research_service import (
     filter_documents_by_topic, extract_keywords,
-    batch_compute_relevance, compute_relevance,
+    compute_multi_signal_relevance, compute_relevance,
     generate_summary, detect_themes, detect_research_gaps,
     build_topic_distribution, build_keyword_frequency, rank_sources,
-    analyze_sentiment,
+    analyze_sentiment_multi,
 )
 from services.web_search_service import search_web_papers
+from services.llm_relevance import LLMRelevanceFilter
 
 
 class ResearchPipeline:
@@ -74,7 +75,7 @@ class ResearchPipeline:
             self._report_progress(progress_callback, 0, "ingesting",
                                   "Searching the web for relevant papers...")
 
-            web_papers = search_web_papers(topic, max_results=40)
+            web_papers = search_web_papers(topic, max_results=80)
 
             # Load all known papers from the database (includes seeded samples + previous web results)
             existing_urls = set()
@@ -165,23 +166,24 @@ class ResearchPipeline:
             topic_dist = build_topic_distribution(processed)
             source_rankings = rank_sources(processed)
 
-            # Batch compute relevance — fits TF-IDF once instead of once per doc
-            doc_texts = [
-                d.get("abstract", "") + " " + d.get("title", "")
-                for d in processed
-            ]
-            relevance_scores = batch_compute_relevance(doc_texts, topic)
+            # Relevance scoring
+            abs_texts = [d.get("abstract", "") for d in processed]
+            title_texts = [d.get("title", "") for d in processed]
+            relevance_scores = compute_multi_signal_relevance(abs_texts, title_texts, topic)
+
             for d, score in zip(processed, relevance_scores):
                 d["relevance_score"] = round(score, 3)
-                d["sentiment"] = analyze_sentiment(
+                sentiment_result = analyze_sentiment_multi(
                     d.get("abstract", "") + " " + d.get("title", "")
                 )
+                d["sentiment"] = sentiment_result["combined"]
+                d["sentiment_scores"] = sentiment_result
 
             processed.sort(key=lambda x: -x.get("relevance_score", 0))
 
             # Apply relevance threshold — only keep the best articles
-            RELEVANCE_THRESHOLD = 0.02  # TF-IDF cosine similarity floor
-            MIN_KEEP = 15               # always keep at least this many
+            RELEVANCE_THRESHOLD = 0.03  # TF-IDF cosine similarity floor
+            MIN_KEEP = 30               # always keep at least this many
             above_bar = [d for d in processed if d.get("relevance_score", 0) >= RELEVANCE_THRESHOLD]
             if len(above_bar) >= MIN_KEEP:
                 processed = above_bar
@@ -189,6 +191,16 @@ class ResearchPipeline:
                 processed = processed[:MIN_KEEP]
             self._report_progress(progress_callback, 0.45, "analyzing",
                                   f"Keeping {len(processed)} documents above relevance threshold ({RELEVANCE_THRESHOLD})")
+
+            # LLM relevance verification — filters out false positives from top docs
+            if processed:
+                self._report_progress(progress_callback, 0.50, "analyzing",
+                                      f"Verifying top documents with LLM relevance model...")
+                llm_filter = LLMRelevanceFilter()
+                processed = llm_filter.filter_top_documents(topic, processed, top_n=25, progress_callback=progress_callback)
+                verified_count = sum(1 for d in processed if d.get("llm_verified"))
+                self._report_progress(progress_callback, 0.60, "analyzing",
+                                      f"LLM verification complete: {verified_count} verified relevant")
 
             # Persist ALL discovered documents into Papers table
             papers_saved = 0
@@ -245,7 +257,7 @@ class ResearchPipeline:
                     paper_lookup[key] = p.id
 
             # Store documents for this job
-            for d in processed[:50]:
+            for d in processed[:100]:
                 doc_title = (d.get("title", "") or "").strip()
                 doc = Document(
                     job_id=job_id,
@@ -259,9 +271,11 @@ class ResearchPipeline:
                     keywords=d.get("keywords", []),
                     relevance_score=d.get("relevance_score", 0),
                     sentiment=d.get("sentiment", "neutral"),
+                    sentiment_scores=d.get("sentiment_scores", {}),
                     topic_cluster=themes[0] if themes else "",
                     source_type=d.get("source_type", "sample"),
                     url=d.get("url", ""),
+                    llm_verified=1 if d.get("llm_verified") else 0,
                 )
                 db.add(doc)
 

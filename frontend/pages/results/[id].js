@@ -160,34 +160,6 @@ export default function Results() {
         <SentimentChart data={docs} />
       </Card>
 
-      {job.source_rankings && job.source_rankings.length > 0 && (
-        <Card title="Source Rankings" subtitle="Venues ranked by average document relevance" className="mb-8">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 font-medium text-gray-500">Source</th>
-                  <th className="text-right py-3 px-2 font-medium text-gray-500">Documents</th>
-                  <th className="text-right py-3 px-2 font-medium text-gray-500">Avg Relevance</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-500">Sample Titles</th>
-                </tr>
-              </thead>
-              <tbody>
-                {job.source_rankings.map((src, i) => (
-                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-2 font-medium text-gray-900">{src.source}</td>
-                    <td className="py-3 px-2 text-right text-gray-600">{src.documents}</td>
-                    <td className="py-3 px-2 text-right text-gray-600">{src.avg_relevance}</td>
-                    <td className="py-3 px-2 text-gray-500 text-xs truncate max-w-xs">
-                      {src.sample_titles?.join(", ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
 
       <Card title="Documents" subtitle={`${docs.length} documents ranked by relevance`}>
         <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-gray-100">

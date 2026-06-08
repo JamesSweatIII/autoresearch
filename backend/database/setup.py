@@ -52,9 +52,11 @@ class Document(Base):
     keywords = Column(JSON, default=list)
     relevance_score = Column(Float, default=0.0)
     sentiment = Column(String(50), default="neutral")
+    sentiment_scores = Column(JSON, default=dict)
     topic_cluster = Column(String(100), default="")
     source_type = Column(String(50), default="sample")
     url = Column(String(500), default="")
+    llm_verified = Column(Integer, default=0)
 
 
 class Paper(Base):
@@ -87,6 +89,24 @@ def _migrate_old_schema():
                 conn.execute(sql_text("DROP INDEX IF EXISTS uq_paper_title"))
                 conn.commit()
             print("[AutoResearch] Removed old unique constraint from papers.title")
+    except Exception:
+        pass
+    try:
+        columns = [c["name"] for c in inspector.get_columns("documents")]
+        if "sentiment_scores" not in columns:
+            with engine.connect() as conn:
+                conn.execute(sql_text("ALTER TABLE documents ADD COLUMN sentiment_scores JSON DEFAULT '{}'"))
+                conn.commit()
+            print("[AutoResearch] Added sentiment_scores column to documents")
+    except Exception:
+        pass
+    try:
+        columns = [c["name"] for c in inspector.get_columns("documents")]
+        if "llm_verified" not in columns:
+            with engine.connect() as conn:
+                conn.execute(sql_text("ALTER TABLE documents ADD COLUMN llm_verified INTEGER DEFAULT 0"))
+                conn.commit()
+            print("[AutoResearch] Added llm_verified column to documents")
     except Exception:
         pass
 

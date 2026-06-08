@@ -146,10 +146,12 @@ def get_documents(job_id: int, limit: int = 50, sentiment: str = Query("", descr
                 abstract=d.abstract or "", keywords=d.keywords or [],
                 relevance_score=d.relevance_score or 0.0,
                 sentiment=d.sentiment or "neutral",
+                sentiment_scores=d.sentiment_scores or {},
                 topic_cluster=d.topic_cluster or "",
                 source_type=d.source_type or "sample",
                 url=d.url or "",
                 paper_id=d.paper_id,
+                llm_verified=bool(getattr(d, "llm_verified", 0)),
             )
             for d in docs
         ]

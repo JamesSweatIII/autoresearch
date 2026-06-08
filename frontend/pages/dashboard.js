@@ -21,12 +21,33 @@ export default function Dashboard() {
   const [backends, setBackends] = useState({ active: "all", backends: [] });
   const [sentimentFilter, setSentimentFilter] = useState("");
   const [sortBy, setSortBy] = useState("date");
+  const [modelTrained, setModelTrained] = useState(false);
+  const [modelPapers, setModelPapers] = useState(0);
+  const [modelLoading, setModelLoading] = useState(true);
+  const [modelTraining, setModelTraining] = useState(false);
+  const [modelResult, setModelResult] = useState("");
+  const [featureImportance, setFeatureImportance] = useState(null);
+  const [testQuery, setTestQuery] = useState("");
+  const [testResult, setTestResult] = useState(null);
+
+  const fetchModelStatus = async () => {
+    try {
+      const res = await fetch("/api/model/status");
+      if (res.ok) {
+        const data = await res.json();
+        setModelTrained(data.trained);
+        setModelPapers(data.papers_count);
+      }
+    } catch {}
+    setModelLoading(false);
+  };
 
   useEffect(() => {
     fetch("/api/search/backends")
       .then((r) => r.json())
       .then(setBackends)
       .catch(() => {});
+    fetchModelStatus();
   }, []);
 
   const switchBackend = async (id) => {
@@ -112,6 +133,39 @@ export default function Dashboard() {
         const job = await res.json();
         setActiveJob(job);
       }
+    } catch {}
+  };
+
+  const trainModel = async () => {
+    setModelTraining(true);
+    setModelResult("");
+    try {
+      const res = await fetch("/api/model/train", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setModelResult(data.message || "Training complete");
+        setModelTrained(true);
+        setModelPapers(data.papers);
+        setFeatureImportance(data.feature_importance);
+      } else {
+        const err = await res.text();
+        setModelResult("Error: " + err);
+      }
+    } catch (err) {
+      setModelResult("Error: " + err.message);
+    }
+    setModelTraining(false);
+  };
+
+  const explainPrediction = async () => {
+    if (!testQuery.trim()) return;
+    try {
+      const res = await fetch("/api/model/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: testQuery, title: testQuery, abstract: "" }),
+      });
+      if (res.ok) setTestResult(await res.json());
     } catch {}
   };
 
@@ -370,6 +424,94 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* ── Model Management ── */}
+      <Card title="Relevance Model" subtitle="Trainable ML model for document relevance scoring" className="mb-8">
+        {modelLoading ? (
+          <p className="text-sm text-gray-400">Loading model status...</p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${modelTrained ? "bg-green-400" : "bg-gray-300"}`} />
+                <span className="text-sm font-medium text-gray-700">{modelTrained ? "Trained" : "Not trained"}</span>
+                {modelTrained && (
+                  <span className="text-xs text-gray-400 ml-3">on {modelPapers} papers</span>
+                )}
+              </div>
+              <button
+                onClick={trainModel}
+                disabled={modelTraining}
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  modelTraining
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                {modelTraining ? "Training..." : "Train Model"}
+              </button>
+            </div>
+
+            {modelResult && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                {modelResult}
+              </div>
+            )}
+
+            {featureImportance && Object.keys(featureImportance).length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Feature Importance</h4>
+                <div className="space-y-1">
+                  {Object.entries(featureImportance)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([name, imp]) => (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 w-32 truncate">{name}</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2">
+                          <div className="bg-indigo-400 h-2 rounded-full" style={{ width: `${imp * 100}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-400 w-12 text-right">{(imp * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {modelTrained && (
+              <div className="border-t border-gray-100 pt-4">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Test Query</h4>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={testQuery}
+                    onChange={(e) => setTestQuery(e.target.value)}
+                    placeholder="Enter a query..."
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                  <button
+                    onClick={explainPrediction}
+                    disabled={!testQuery.trim()}
+                    className="px-4 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    Explain
+                  </button>
+                </div>
+                {testResult && (
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                    <p className="font-medium text-gray-900 mb-1">Score: <span className="text-indigo-600">{testResult.score}</span></p>
+                    <div className="space-y-0.5">
+                      {Object.entries(testResult.contributions || {}).map(([name, val]) => (
+                        <p key={name} className="text-xs text-gray-500">{name}: {val}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
     </div>
   );
 }
