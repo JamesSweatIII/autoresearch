@@ -1,4 +1,5 @@
 import time
+import re
 from typing import List, Dict, Optional
 from collections import Counter
 from pathlib import Path
@@ -20,6 +21,7 @@ try:
 except ImportError:
     PY4J_AVAILABLE = False
 
+from sqlalchemy import func
 from database.setup import get_session, ResearchJob, Document, Paper, init_db
 from services.research_service import (
     filter_documents_by_topic, extract_keywords,
@@ -205,12 +207,14 @@ class ResearchPipeline:
             # Persist ALL discovered documents into Papers table
             papers_saved = 0
             for d in processed:
-                d_title = (d.get("title") or "").strip()
-                if not d_title:
+                raw_title = (d.get("title") or "").strip()
+                if not raw_title:
                     continue
-                dup = bool(db.query(Paper).filter(Paper.title == d_title).first())
+                d_title = re.sub(r'\s+', ' ', raw_title)
+                d_title_lower = d_title.lower()
+                dup = bool(db.query(Paper).filter(func.lower(Paper.title) == d_title_lower).first())
                 if not dup:
-                    d_url = (d.get("url") or "").strip()
+                    d_url = (d.get("url") or "").rstrip("/").strip()
                     if d_url:
                         dup = bool(db.query(Paper).filter(Paper.url == d_url).first())
                 if not dup:

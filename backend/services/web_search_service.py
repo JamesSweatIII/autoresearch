@@ -688,7 +688,7 @@ def _search_all_backends(topic: str, max_results: int) -> List[Dict]:
                 print(f"[AutoResearch Web] {name} returned {len(results)} results")
                 for p in results:
                     url = (p.get("url") or "").rstrip("/").lower()
-                    title = (p.get("title") or "").strip().lower()
+                    title = re.sub(r'\s+', ' ', (p.get("title") or "").strip()).lower()
                     dedup_key = url or title
                     if dedup_key and dedup_key not in seen_urls:
                         seen_urls.add(dedup_key)
