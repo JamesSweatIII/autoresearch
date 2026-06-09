@@ -197,7 +197,7 @@ class ResearchPipeline:
                 self._report_progress(progress_callback, 0.50, "analyzing",
                                       f"Verifying top documents with LLM relevance model...")
                 llm_filter = LLMRelevanceFilter()
-                processed = llm_filter.filter_top_documents(topic, processed, top_n=25, progress_callback=progress_callback)
+                processed = llm_filter.filter_top_documents(topic, processed, top_n=10, progress_callback=progress_callback)
                 verified_count = sum(1 for d in processed if d.get("llm_verified"))
                 self._report_progress(progress_callback, 0.60, "analyzing",
                                       f"LLM verification complete: {verified_count} verified relevant")

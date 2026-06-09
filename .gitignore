@@ -33,3 +33,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# SSH keys and secrets
+*.pem
+*.key

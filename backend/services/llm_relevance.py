@@ -48,7 +48,7 @@ class LLMRelevanceFilter:
         prompt = (
             f"Research Topic: {topic}\n\n"
             f"Paper Title: {title}\n"
-            f"Paper Abstract: {abstract[:800]}\n\n"
+            f"Paper Abstract: {abstract[:500]}\n\n"
             f"Question: Is this paper directly relevant to the research topic?\n"
             f"Answer with exactly one word: YES or NO."
         )
@@ -68,7 +68,7 @@ class LLMRelevanceFilter:
 
     def filter_top_documents(
         self, topic: str, documents: List[Dict],
-        top_n: int = 20,
+        top_n: int = 10,
         progress_callback: Optional[Callable] = None,
     ) -> List[Dict]:
         if not documents:
@@ -82,9 +82,8 @@ class LLMRelevanceFilter:
                 progress_callback({
                     "progress": 0.30 + 0.15 * ((i + 1) / len(llm_candidates)),
                     "stage": "analyzing",
-                    "message": f"LLM relevance verification: {i+1}/{len(llm_candidates)}",
+                    "message": f"LLM relevance: {i + 1}/{len(llm_candidates)}",
                 })
-
             try:
                 is_rel = self.judge_relevance(
                     topic, doc.get("title", ""), doc.get("abstract", "")
@@ -92,8 +91,14 @@ class LLMRelevanceFilter:
             except Exception as e:
                 print(f"[LLM] Error judging doc: {e}")
                 is_rel = True
-
             doc["llm_verified"] = is_rel
+
+        if progress_callback:
+            progress_callback({
+                "progress": 0.45,
+                "stage": "analyzing",
+                "message": f"LLM relevance verification complete for {len(llm_candidates)} documents",
+            })
 
         kept = [d for d in llm_candidates if d.get("llm_verified")]
         removed = len(llm_candidates) - len(kept)

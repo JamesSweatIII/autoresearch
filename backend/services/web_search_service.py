@@ -21,6 +21,12 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/125.0.0.0 Safari/537.36"
     ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 _LAST_API_CALL = 0
@@ -78,6 +84,8 @@ def _extract_source(url: str) -> str:
         "dl.acm.org": "ACM",
         "pubmed.ncbi.nlm.nih.gov": "PubMed",
         "ncbi.nlm.nih.gov": "PubMed Central",
+        "pubmed.ncbi.nlm.nih.gov": "PubMed",
+        "openalex.org": "OpenAlex",
         "openreview.net": "OpenReview",
         "papers.nips.cc": "NeurIPS",
         "proceedings.mlr.press": "PMLR",
@@ -395,18 +403,29 @@ def _search_google_scholar(topic: str, max_results: int) -> List[Dict]:
     try:
         params = {"q": query, "hl": "en", "as_ylo": "2018"}
         url = f"https://scholar.google.com/scholar?{urllib.parse.urlencode(params)}"
-        resp = requests.get(url, headers={**HEADERS, "Accept-Language": "en-US,en;q=0.9"}, timeout=10)
+        scholar_headers = {**HEADERS, "Referer": "https://scholar.google.com/"}
+        resp = requests.get(url, headers=scholar_headers, timeout=15, cookies={})
         if resp.status_code != 200:
+            print(f"[AutoResearch Web] Google Scholar returned status {resp.status_code}")
             return papers
         soup = BeautifulSoup(resp.text, "html.parser")
-        for row in soup.select(".gs_r.gs_or.gs_scl"):
+        selectors = [".gs_r.gs_or.gs_scl", ".gs_r", "[data-cid]"]
+        rows = []
+        for sel in selectors:
+            rows = soup.select(sel)
+            if rows:
+                break
+        if not rows:
+            print(f"[AutoResearch Web] Google Scholar: no result rows found (possible CAPTCHA)")
+            return papers
+        for row in rows:
             if len(papers) >= max_results:
                 break
-            a = row.select_one(".gs_rt a")
+            a = row.select_one(".gs_rt a") or row.select_one("h3 a") or row.select_one("a[href]")
             if not a:
                 continue
             href = a.get("href", "")
-            if not href or href in seen_urls:
+            if not href or href in seen_urls or href.startswith("#"):
                 continue
             seen_urls.add(href)
             title = a.get_text(strip=True)
@@ -423,6 +442,157 @@ def _search_google_scholar(topic: str, max_results: int) -> List[Dict]:
             papers.append(paper)
     except Exception as e:
         print(f"[AutoResearch Web] Google Scholar search failed: {e}")
+    return papers[:max_results]
+
+
+def _search_openalex(topic: str, max_results: int) -> List[Dict]:
+    papers = []
+    seen_titles = set()
+    try:
+        params = urllib.parse.urlencode({
+            "search": topic,
+            "per-page": str(min(max_results * 2, 50)),
+            "sort": "relevance_score:desc",
+            "select": "id,title,authorships,publication_year,primary_location,abstract_inverted_index,open_access,cited_by_count",
+        })
+        url = f"https://api.openalex.org/works?{params}"
+        resp = _rate_limited_request(url, timeout=15)
+        if not resp or resp.status_code != 200:
+            return papers
+        data = resp.json()
+        for item in data.get("results", []):
+            if len(papers) >= max_results:
+                break
+            title = _clean_title(item.get("title", "") or "")
+            if not title or title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+            authors = ", ".join(
+                a.get("author", {}).get("display_name", "")
+                for a in (item.get("authorships") or [])
+                if a.get("author")
+            )
+            loc = item.get("primary_location") or {}
+            source_obj = loc.get("source") or {}
+            source = source_obj.get("display_name") or "OpenAlex"
+            year = item.get("publication_year") or 2024
+            oa = item.get("open_access") or {}
+            oa_url = oa.get("oa_url") or ""
+            abstract = ""
+            inv_index = item.get("abstract_inverted_index")
+            if inv_index:
+                word_positions = {}
+                for word, positions in inv_index.items():
+                    for pos in positions:
+                        word_positions[pos] = word
+                if word_positions:
+                    abstract = " ".join(word_positions[i] for i in sorted(word_positions))
+            paper_url = f"https://openalex.org/{item.get('id', '')}" if item.get("id") else oa_url
+            papers.append({
+                "title": title,
+                "abstract": abstract,
+                "authors": authors,
+                "source": source,
+                "year": year,
+                "keywords": _extract_keywords_from_text(title + " " + abstract),
+                "url": paper_url,
+                "content": abstract,
+                "source_type": "web",
+            })
+    except Exception as e:
+        print(f"[AutoResearch Web] OpenAlex search failed: {e}")
+    return papers[:max_results]
+
+
+def _search_pubmed(topic: str, max_results: int) -> List[Dict]:
+    papers = []
+    seen_titles = set()
+    try:
+        search_params = urllib.parse.urlencode({
+            "db": "pubmed",
+            "term": topic,
+            "retmax": str(min(max_results * 2, 50)),
+            "retmode": "json",
+            "sort": "relevance",
+        })
+        search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?{search_params}"
+        search_resp = _rate_limited_request(search_url, timeout=15)
+        if not search_resp or search_resp.status_code != 200:
+            return papers
+        search_data = search_resp.json()
+        id_list = search_data.get("esearchresult", {}).get("idlist", [])
+        if not id_list:
+            return papers
+        fetch_params = urllib.parse.urlencode({
+            "db": "pubmed",
+            "id": ",".join(id_list),
+            "retmode": "xml",
+            "rettype": "abstract",
+        })
+        fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?{fetch_params}"
+        fetch_resp = _rate_limited_request(fetch_url, timeout=20)
+        if not fetch_resp or fetch_resp.status_code != 200:
+            return papers
+        soup = BeautifulSoup(fetch_resp.text, "lxml-xml")
+        for article in soup.find_all("PubmedArticle"):
+            if len(papers) >= max_results:
+                break
+            medline = article.find("MedlineCitation")
+            if not medline:
+                continue
+            art = medline.find("Article")
+            if not art:
+                continue
+            title_el = art.find("ArticleTitle")
+            title = _clean_title(title_el.text.strip() if title_el is not None else "")
+            if not title or title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+            abstract_el = art.find("Abstract")
+            abstract = ""
+            if abstract_el is not None:
+                parts = [t.text.strip() for t in abstract_el.find_all("AbstractText")]
+                abstract = " ".join(parts)
+            authors = []
+            author_list = art.find("AuthorList")
+            if author_list is not None:
+                for a in author_list.find_all("Author"):
+                    ln = a.find("LastName")
+                    fn = a.find("ForeName")
+                    if ln is not None:
+                        name = f"{fn.text.strip() if fn is not None else ''} {ln.text.strip()}".strip()
+                        if name:
+                            authors.append(name)
+            journal = art.find("Journal")
+            journal_title = ""
+            if journal is not None:
+                jt = journal.find("Title")
+                if jt is not None:
+                    journal_title = jt.text.strip()
+            pub_date = article.find("PubMedPubDate")
+            year = 2024
+            if pub_date is not None:
+                py = pub_date.find("Year")
+                if py is not None:
+                    try:
+                        year = int(py.text.strip())
+                    except ValueError:
+                        pass
+            pmid = medline.find("PMID")
+            pmid_text = pmid.text.strip() if pmid is not None else ""
+            papers.append({
+                "title": title,
+                "abstract": abstract,
+                "authors": ", ".join(authors),
+                "source": journal_title or "PubMed",
+                "year": year,
+                "keywords": _extract_keywords_from_text(title + " " + abstract),
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid_text}/" if pmid_text else "",
+                "content": abstract,
+                "source_type": "web",
+            })
+    except Exception as e:
+        print(f"[AutoResearch Web] PubMed search failed: {e}")
     return papers[:max_results]
 
 
@@ -443,6 +613,16 @@ BACKENDS = {
         "name": "Semantic Scholar",
         "description": "Academic paper API — structured metadata, no API key needed",
         "search": _search_semantic_scholar,
+    },
+    "openalex": {
+        "name": "OpenAlex",
+        "description": "OpenAlex — open scholarly index with rich metadata, no API key needed",
+        "search": _search_openalex,
+    },
+    "pubmed": {
+        "name": "PubMed",
+        "description": "PubMed — biomedical and life sciences literature, free NCBI API",
+        "search": _search_pubmed,
     },
     "google_scholar": {
         "name": "Google Scholar",

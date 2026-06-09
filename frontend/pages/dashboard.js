@@ -62,7 +62,7 @@ export default function Dashboard() {
       const params = new URLSearchParams();
       if (sentimentFilter) params.set("sentiment", sentimentFilter);
       if (sortBy) params.set("sort_by", sortBy);
-      const res = await fetch(`/api/research/?${params}`);
+      const res = await fetch(`/api/research?${params}`);
       if (res.ok) setJobs(await res.json());
     } catch {}
   }, [sentimentFilter, sortBy]);
@@ -95,7 +95,7 @@ export default function Dashboard() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/research/", {
+      const res = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic }),

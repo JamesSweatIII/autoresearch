@@ -16,6 +16,7 @@ class ResearchResult(ResearchJobResponse):
     pass
 
 
+@router.post("", response_model=ResearchJobResponse)
 @router.post("/", response_model=ResearchJobResponse)
 def create_research_job(req: ResearchJobCreate):
     db = get_session()
@@ -50,6 +51,7 @@ def create_research_job(req: ResearchJobCreate):
         db.close()
 
 
+@router.get("", response_model=list)
 @router.get("/", response_model=list)
 def list_jobs(
     sentiment: str = Query("", description="Filter by dominant sentiment (positive/negative/neutral)"),
