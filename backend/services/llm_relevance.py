@@ -36,7 +36,7 @@ class LLMRelevanceFilter:
             result = json.loads(resp.read())
         return result.get("response", "")
 
-    def judge_relevance(self, topic: str, title: str, abstract: str) -> bool:
+    def judge_relevance(self, topic: str, title: str, abstract: str, intro_text: str = "") -> bool:
         key = self._cache_key(topic, title)
         if key in self._cache:
             self._stats["cached"] += 1
@@ -45,10 +45,13 @@ class LLMRelevanceFilter:
         self._stats["total"] += 1
         start = time.time()
 
+        context = intro_text[:1200] if intro_text else abstract[:500]
+        label = "Paper Introduction" if intro_text else "Paper Abstract"
+
         prompt = (
             f"Research Topic: {topic}\n\n"
             f"Paper Title: {title}\n"
-            f"Paper Abstract: {abstract[:500]}\n\n"
+            f"{label}: {context}\n\n"
             f"Question: Is this paper directly relevant to the research topic?\n"
             f"Answer with exactly one word: YES or NO."
         )
@@ -86,7 +89,8 @@ class LLMRelevanceFilter:
                 })
             try:
                 is_rel = self.judge_relevance(
-                    topic, doc.get("title", ""), doc.get("abstract", "")
+                    topic, doc.get("title", ""), doc.get("abstract", ""),
+                    intro_text=doc.get("intro_text", ""),
                 )
             except Exception as e:
                 print(f"[LLM] Error judging doc: {e}")

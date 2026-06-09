@@ -145,6 +145,7 @@ def _paper_from_meta(title: str, snippet: str, url: str) -> Dict:
         "url": url,
         "content": snippet,
         "source_type": "web",
+        "pdf_url": "",
     }
 
 
@@ -156,6 +157,7 @@ def _enrich_with_arxiv(paper: Dict) -> Dict:
             paper.update(meta)
             paper["source"] = "arXiv"
             paper["url"] = f"https://arxiv.org/abs/{arxiv_id}"
+            paper["pdf_url"] = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
             paper["source_type"] = "web"
     return paper
 
@@ -289,6 +291,7 @@ def _search_arxiv(topic: str, max_results: int) -> List[Dict]:
                     "url": f"https://arxiv.org/abs/{arxiv_id}",
                     "content": abstract.text.strip() if abstract else "",
                     "source_type": "web",
+                    "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}.pdf",
                 })
         except Exception as e:
             print(f"[AutoResearch Web] arXiv search failed: {e}")
@@ -345,6 +348,7 @@ def _search_crossref(topic: str, max_results: int) -> List[Dict]:
                     "url": f"https://doi.org/{doi}" if doi else "",
                     "content": abstract,
                     "source_type": "web",
+                    "pdf_url": "",
                 })
         except Exception as e:
             print(f"[AutoResearch Web] Crossref search failed: {e}")
@@ -375,6 +379,7 @@ def _search_semantic_scholar(topic: str, max_results: int) -> List[Dict]:
                 "url": f"https://www.semanticscholar.org/paper/{paper_id}",
                 "content": "",
                 "source_type": "web",
+                "pdf_url": "",
             })
         # Batch-fetch abstracts for richer results
         if papers:
@@ -498,6 +503,7 @@ def _search_openalex(topic: str, max_results: int) -> List[Dict]:
                 "url": paper_url,
                 "content": abstract,
                 "source_type": "web",
+                "pdf_url": oa_url,
             })
     except Exception as e:
         print(f"[AutoResearch Web] OpenAlex search failed: {e}")
@@ -580,6 +586,15 @@ def _search_pubmed(topic: str, max_results: int) -> List[Dict]:
                         pass
             pmid = medline.find("PMID")
             pmid_text = pmid.text.strip() if pmid is not None else ""
+            article_ids = article.find_all("ArticleId")
+            pmc_id = ""
+            for aid in article_ids:
+                if aid.get("IdType") == "pmc":
+                    pmc_id = aid.text.strip()
+                    break
+            pdf_url = ""
+            if pmc_id:
+                pdf_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc_id}/pdf/"
             papers.append({
                 "title": title,
                 "abstract": abstract,
@@ -590,6 +605,7 @@ def _search_pubmed(topic: str, max_results: int) -> List[Dict]:
                 "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid_text}/" if pmid_text else "",
                 "content": abstract,
                 "source_type": "web",
+                "pdf_url": pdf_url,
             })
     except Exception as e:
         print(f"[AutoResearch Web] PubMed search failed: {e}")

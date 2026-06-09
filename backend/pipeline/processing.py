@@ -32,6 +32,7 @@ from services.research_service import (
 )
 from services.web_search_service import search_web_papers
 from services.llm_relevance import LLMRelevanceFilter
+from services.pdf_service import enrich_docs_with_intros
 
 
 class ResearchPipeline:
@@ -193,6 +194,12 @@ class ResearchPipeline:
                 processed = processed[:MIN_KEEP]
             self._report_progress(progress_callback, 0.45, "analyzing",
                                   f"Keeping {len(processed)} documents above relevance threshold ({RELEVANCE_THRESHOLD})")
+
+            # PDF introduction extraction — enrich top docs with intro text
+            if processed:
+                self._report_progress(progress_callback, 0.48, "analyzing",
+                                      f"Downloading PDFs and extracting introductions...")
+                processed = enrich_docs_with_intros(processed)
 
             # LLM relevance verification — filters out false positives from top docs
             if processed:
