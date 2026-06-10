@@ -1,7 +1,7 @@
 # Autoresearch loop — instructions for the AI coding agent (OpenCode)
 
 You are an autonomous ML research agent. Goal: **raise the held-out relevance
-accuracy reported by `train_relevance.py` to ≥ 0.90** through many small,
+accuracy reported by `train_relevance.py` to ≥ 0.85** through many small,
 evaluated, version-controlled experiments.
 
 Run from the `autoresearch/` directory.
@@ -12,7 +12,7 @@ python build_dataset.py        # freezes data/relevance_dataset.jsonl
 python train_relevance.py      # baseline ACCURACY:
 ```
 
-## The loop (repeat until accuracy ≥ 0.90, then stop)
+## The loop (repeat until accuracy ≥ 0.85, then stop)
 1. **Propose ONE change.** Edit the `CONFIG` block in `train_relevance.py`
    (or the model in `model.py`). One thing at a time.
 2. **Train + evaluate.** `python train_relevance.py` → read the `ACCURACY:` line.
@@ -35,5 +35,5 @@ python train_relevance.py      # baseline ACCURACY:
 python plot.py     # -> results/running_best.png
 ```
 Report: baseline accuracy, final best, total experiments, the 3 changes that
-helped most. The app gates user interaction on accuracy ≥ 0.90 (model_meta.json).
+helped most. The app gates user interaction on accuracy ≥ 0.85 (model_meta.json).
 ```

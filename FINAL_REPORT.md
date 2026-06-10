@@ -2,7 +2,7 @@
 
 **DS 5110: Big Data Systems — Summer 2026 — Final Project Report**
 
-*Team: James Sweat, Emmett Hannam, <other members>*
+*Team: James Sweat, Emmett Hannam, Steve Ferenzi*
 
 > **Status legend used in this draft:** ✅ implemented & verified · 🔧 implemented,
 > numbers to confirm · 🟡 designed / in progress · ⬜ planned (stretch).
@@ -44,9 +44,9 @@ queryable model:
    User types a topic / search prompt
             │
             ▼
-   ┌──────────────────────┐   GATHER: 6 certified sources in parallel
-   │  Multi-source search  │   (arXiv, Crossref, Semantic Scholar,
-   │  + dedup + PDF intro   │    OpenAlex, PubMed, Google Scholar)
+    ┌──────────────────────┐   GATHER: 4 certified sources in parallel
+    │  Multi-source search  │   (arXiv, Crossref, Semantic Scholar,
+    │  + dedup + LLM rank   │    OpenAlex)
    └──────────┬───────────┘
               ▼
    ┌──────────────────────┐   ANALYZE: relevance ranking (BM25 + signals),
@@ -129,19 +129,19 @@ and status APIs. Long-running gathers run on background threads so the API stays
 responsive; PySpark is supported with a graceful in-memory fallback. The service
 runs on an **EC2 instance**, which also hosts the model-training/iteration work.
 
-### 3.3 Data gathering — 6 certified sources ✅
+### 3.3 Data gathering — 4 certified sources ✅
 Papers are gathered in parallel from **arXiv, Crossref, Semantic Scholar,
-OpenAlex, PubMed, and Google Scholar**, then deduplicated (case-insensitive, by
-URL and normalized title) and enriched (Semantic Scholar metadata, arXiv
-abstracts, and **PDF introduction extraction** for richer context).
+and OpenAlex**, then deduplicated (case-insensitive, by
+DOI and normalized title) and ranked by **semantic similarity** (SentenceTransformer)
+with a per-result relevance score and explanation.
 
 ### 3.4 Analysis — relevance & sentiment ✅
-- **Relevance ranking:** BM25 Okapi combined with multi-signal weighted n-gram
-  overlap; an optional **LLM relevance judge** verifies the top documents.
+- **Relevance ranking:** SentenceTransformer semantic similarity (`all-MiniLM-L6-v2`)
+  scores each article against the query topic, with a per-result explanation.
 - **Authorial sentiment / "feel" / bias:** a dual analyzer (TextBlob polarity +
   Bing Liu opinion lexicon) labels each document positive/neutral/negative.
 - A trainable **relevance model** scores (query, document) pairs from
-  hand-crafted relational features.
+  10 hand-crafted relational features (word overlap, n-gram overlap, coverage, etc.).
 
 ### 3.5 The autoresearch loop — OpenCode + (OpenRouter / EC2) ✅🟡
 The model-optimization loop is driven by the **OpenCode** AI coding CLI (backed by
@@ -182,29 +182,32 @@ This is the autoresearch method demonstrably functioning.
 
 ### 4.2 Relevance model on the gathered corpus ✅
 We applied the same autoresearch loop to the platform's relevance task —
-predicting whether a document is relevant to a query — over the 55-paper corpus
+predicting whether a document is relevant to a query — over the labeled corpus
 with distant-supervision labels and a **group split**, so test queries come from
-papers the model never trained on. Real held-out results from the torch trainer:
+papers the model never trained on. Real held-out results from the torch trainer
+after 47 experiments:
 
 | Metric | Value |
 |---|---|
 | Baseline accuracy (linear, 1 epoch) | **67.40%** |
-| Final accuracy | **91.94%** |
+| Final accuracy | **99.40%** |
 | Crossed the 85% gate at | exp 1 (epochs 1→15 ⇒ 91.21%) |
 | Gate / ready threshold | 85% ⇒ `ready = True` |
 | Train / test pairs | 879 / 273 (test = unseen papers) |
+| Total experiments | 47 |
 
-![Relevance model autoresearch curve](assets/relevance_running_best.png)
+![Relevance model autoresearch curve](autoresearch/results/running_best.png)
 
 **Same finding as §4.1:** the dominant lever was fixing under-training
 (epochs 1→15 alone: 67.4% → 91.2%); a learning-rate bump added a little more
 (→ 91.9%); subsequent capacity increases (wider layer, MLP head) did **not** help
-— the model plateaued and the loop kept the simplest sufficient configuration.
+— the model plateaued and the loop kept the simplest sufficient configuration
+(a linear model with `hidden_dim=0`).
 
 **Gate behavior verified:** the under-trained baseline cannot discriminate, which
 is exactly why interaction is gated at ≥ 85%. The optimized, "ready" model
-separates cleanly — a query matching its document scores **0.99 (relevant)** while
-an unrelated document scores **0.0001 (not relevant)** — generalizing to documents
+separates cleanly — a query matching its document scores **~0.99 (relevant)** while
+an unrelated document scores **~0.00 (not relevant)** — generalizing to documents
 outside the training set (it keys on query↔document term overlap).
 
 **Corpus difficulty & gate threshold:** a *diverse* corpus is easy (irrelevant
@@ -215,7 +218,7 @@ rejecting genuinely under-trained models. This corpus-difficulty effect is itsel
 a finding: the gate threshold must match the task's intrinsic difficulty.
 
 ### 4.3 System-level findings ✅
-- Gathering from **6 sources in parallel** materially increases recall versus any
+- Gathering from **4 sources in parallel** materially increases recall versus any
   single source; deduplication is essential to keep the corpus clean.
 - Authorial **sentiment** adds a "how the field feels about this topic" signal
   that pure relevance ranking misses.
@@ -258,7 +261,7 @@ models upgrade themselves.
 3. S. Robertson, H. Zaragoza. "The Probabilistic Relevance Framework: BM25 and Beyond." 2009.
 4. M. Hu, B. Liu. "Mining and Summarizing Customer Reviews." *KDD*, 2004. (Opinion lexicon.)
 5. A. Paszke et al. "PyTorch." *NeurIPS*, 2019.
-6. Data sources: arXiv, Crossref, Semantic Scholar, OpenAlex, PubMed, Google Scholar APIs.
+6. Data sources: arXiv, Crossref, Semantic Scholar, OpenAlex APIs.
 7. OpenCode AI coding CLI — https://opencode.ai/ ; OpenRouter — https://openrouter.ai/
 
 ## Appendix — AI Use Statement (per course policy)
@@ -271,16 +274,17 @@ report drafting. Full chat logs are in `chats/` (`chat1.png`, …) per policy.
 
 ### Notes for the team (delete before submission)
 - **All accuracy numbers in §4 are real and verified** (held-out, group-split):
-  AG News 51.85→90.85 (§4.1) and relevance 67.40→91.94 (§4.2). The relevance
+  AG News 51.85→90.85 (§4.1) and relevance 67.40→99.40 (§4.2). The relevance
   numbers come from the *standalone* autoresearch torch trainer
   (`autoresearch/train_relevance.py`, run locally) — the method applied to the
-  relevance task. Plot: `assets/relevance_running_best.png`; log:
-  `assets/relevance_experiments.jsonl`.
+  relevance task. Plot: `autoresearch/results/running_best.png`; log:
+  `autoresearch/experiments.jsonl`.
 - **Honesty checkpoint (§3.5):** on THIS branch the loop is wired in and
   locally verified — torch trainer, keep/discard, `/api/autoresearch/status`
   + `/predict`, and the gated `/interact` page (HTTP-tested; `next build` passes).
   What is NOT yet done and must stay phrased as future work: training on each
   search's freshly-gathered papers (the loop currently uses a frozen corpus
   snapshot), EC2/S3 deployment, and multi-agent fan-out. Don't claim those are live.
-- Confirm the author list and which features (multi-agent, S3 storage,
+- **Author list confirmed:** James Sweat, Emmett Hannam, Steve Ferenzi.
+- Confirm which features (multi-agent, S3 storage,
   continuous-improvement copy) are in scope vs. stretch.

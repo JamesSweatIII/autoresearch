@@ -1,6 +1,7 @@
 # AutoResearch — AI-Powered Research Intelligence Platform
 
-An end-to-end platform that ingests, analyzes, and summarizes research documents using PySpark, NLP, and AI. Built with FastAPI, Next.js, and Tailwind CSS.
+An end-to-end platform that gathers, analyzes, and trains relevance models on
+academic research papers. Built with FastAPI, Next.js 14, PyTorch, and Tailwind CSS.
 
 ## Quick Start
 
@@ -27,96 +28,127 @@ App runs at `http://localhost:3000`.
 ## Architecture
 
 ```
-User → Dashboard (Next.js) → API (FastAPI) → Pipeline (PySpark/Local)
+User → Dashboard (Next.js) → API (FastAPI) → Article Retrieval (4 sources)
          ↓                        ↓                    ↓
-      Results Page ←──── SQLite Database ←─── NLP Analysis + Summarization
+      Results ←──── SQLite Database ←─── Semantic Ranking + Sentiment
+                                            ↓
+                                     Autoresearch Torch Model
+                                     (gated at ≥85% accuracy)
 ```
 
-### Pipeline Stages
+### Pipeline
 
-1. **Ingestion** — Load documents from sample data (50 AI/ML papers)
-2. **Filtering** — Score documents by query-relevance using term overlap
-3. **Processing** — PySpark (if available) or in-memory Python fallback
-4. **NLP Analysis** — Keyword extraction, sentiment classification, relevance scoring
-5. **Theme Detection** — Cluster keywords into research themes
-6. **Summarization** — Generate executive summary, identify research gaps
+1. **Article Retrieval** — Search 4 academic sources in parallel (Semantic Scholar, OpenAlex, arXiv, CrossRef)
+2. **Semantic Ranking** — Score articles by SentenceTransformer similarity to the query topic
+3. **Sentiment Analysis** — Classify authorial sentiment (TextBlob + Bing Liu lexicon)
+4. **Autoresearch Loop** — AI agent (OpenCode) iterates on a PyTorch model: edit → train → eval → keep/discard
+5. **Gate & Interact** — Model unlocks at ≥85% held-out accuracy; query relevance via `/interact` page
 
 ### Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend | FastAPI, SQLAlchemy, SQLite |
-| Big Data | PySpark (optional, graceful fallback) |
-| NLP | NLTK, regex-based keyword extraction |
+| Search | Semantic Scholar, OpenAlex, arXiv, CrossRef APIs |
+| ML | PyTorch 2.1+, SentenceTransformers, scikit-learn |
+| NLP | NLTK, TextBlob, Bing Liu sentiment lexicon |
 | Frontend | Next.js 14, Tailwind CSS, Recharts |
-| Processing | Multi-threaded background jobs |
+| Agent | OpenCode (AI coding CLI via OpenRouter) |
 
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/stats` | Dataset statistics (50 docs, sources, years) |
+| GET | `/api/stats` | Dataset statistics |
 | GET | `/api/sources` | List all publication venues |
-| POST | `/api/research/` | Create a new research job |
-| GET | `/api/research/` | List recent jobs |
-| GET | `/api/research/{id}` | Get job results + summary |
-| GET | `/api/research/{id}/documents` | Get ranked documents |
-
-## Sample Dataset
-
-50 influential AI/ML papers (2012–2024) from top venues:
-NeurIPS, ICML, CVPR, Nature, ACL, ICLR, and more.
+| GET | `/api/papers` | List/filter papers |
+| GET | `/api/papers/{id}` | Paper detail + similar papers |
+| POST | `/api/articles/search` | Multi-source article search |
+| POST | `/api/articles/save` | Save article to database |
+| POST | `/api/pooler/pool` | Background article gathering |
+| GET | `/api/pooler/status` | Pooler background task status |
+| GET | `/api/autoresearch/status` | Model readiness gate |
+| POST | `/api/autoresearch/predict` | Score a (query, doc) pair |
+| POST | `/api/autoresearch/train` | Train model on gathered papers |
 
 ## Project Structure
 
 ```
-autoreaserch/
+autoresearch/
 ├── backend/
-│   ├── main.py
-│   ├── routes/                  # API route handlers
-│   ├── services/                # NLP, filtering, scoring
-│   ├── models/                  # Pydantic schemas
-│   ├── database/                # SQLAlchemy models
-│   └── pipeline/                # PySpark / local processing
+│   ├── main.py                  # FastAPI app entry point
+│   ├── database/
+│   │   └── setup.py             # SQLAlchemy models (Paper, Document, ResearchJob)
+│   ├── routes/
+│   │   ├── article_routes.py    # POST /api/articles/search, /save
+│   │   ├── autoresearch_routes.py  # GET/POST /api/autoresearch/*
+│   │   ├── pooler_routes.py     # POST /api/pooler/pool
+│   │   └── legacy_routes.py     # GET /api/stats, /api/papers, /api/sources
+│   └── services/
+│       ├── article_retrieval.py # Multi-source search + semantic ranking
+│       ├── article_pooler.py    # Background topic-based article gathering
+│       └── local_llm.py         # SentenceTransformer ranking
 ├── frontend/
-│   ├── pages/                   # Next.js routes
-│   ├── components/              # React components
-│   │   ├── ui/                  # Base UI (Card, etc.)
-│   │   ├── charts/              # Recharts visualizations
-│   │   ├── dashboard/           # Dashboard widgets
-│   │   └── layout/              # Navbar, Layout
+│   ├── pages/                   # Next.js routes (dashboard, interact, knowledge, pipeline, about)
+│   ├── components/              # React components (ui/, charts/, dashboard/, layout/)
 │   └── styles/
+├── autoresearch/                # Autonomous experimentation module
+│   ├── train_relevance.py       # PyTorch training (agent iterates on this)
+│   ├── model.py                 # RelevanceNet (simple MLP)
+│   ├── features.py              # 10 relational features
+│   ├── infer.py                 # Inference for the backend
+│   ├── build_dataset.py         # Labeled dataset builder
+│   ├── plot.py                  # Accuracy progress curve
+│   └── AGENT_INSTRUCTIONS.md    # Keep/discard loop for OpenCode
 ├── data/
-│   └── sample_documents.json
+│   ├── autoresearch.db          # SQLite database
+│   ├── sample_documents.json.bak  # Sample papers (50 AI/ML papers)
+│   ├── relevance_model.pkl      # sklearn relevance model
+│   └── salex_bing.csv           # Bing Liu sentiment lexicon
+├── DEMO.md
+├── FINAL_REPORT.md
+├── PLAN.md
+├── SLIDES.md
+├── DEPLOY.md
 └── README.md
 ```
 
-## Article Retrieval Pipeline
+## Article Retrieval
 
-The article retrieval system (`backend/services/article_retrieval.py`) finds relevant academic articles by:
+The article retrieval system (`backend/services/article_retrieval.py`) finds relevant
+academic articles by querying **4 sources in parallel**:
 
-1. **Query Expansion** — Generates 6–10 academic queries from a user topic (surveys, keyword combinations, phased variants).
-2. **Multi-Source Search** — Queries **Semantic Scholar**, **OpenAlex**, and **arXiv** in parallel via their public APIs.
-3. **Normalization** — Each source's response is mapped to a `ResearchArticle` dataclass (title, authors, year, abstract, DOI, citation count, URL).
-4. **Deduplication** — Removes duplicates by DOI first, then by normalized title.
-5. **Ranking** — Scores each article using the weighted formula:
+1. **Semantic Scholar** — Rich metadata + citation counts
+2. **OpenAlex** — Large open scholarly index
+3. **arXiv** — Pre-print repository
+4. **CrossRef** — DOI registration agency
 
-   | Component | Weight | Description |
-   |-----------|--------|-------------|
-   | Semantic similarity | 0.45 | Keyword overlap (swappable with dense embeddings) |
-   | Title keyword match | 0.20 | Fraction of topic keywords in the title |
-   | Abstract keyword match | 0.15 | Fraction of topic keywords in the abstract |
-   | Citation count | 0.10 | Log-normalized citation count |
-   | Recency | 0.10 | Exponential decay from current year |
+Results are deduplicated (by DOI then normalized title), then ranked by
+**SentenceTransformer semantic similarity** (`all-MiniLM-L6-v2`) against the
+user's topic. Each result includes a relevance score and explanation.
 
-   Each result includes a `reasonSelected` field explaining its ranking.
+**Endpoint:** `POST /api/articles/search` — body: `{"topic": "your topic", "sources": ["semantic_scholar", "openalex", "arxiv", "crossref"]}`
 
-6. **Top 10** — The highest-scoring unique articles are returned.
+No API keys required (all sources are free/public).
 
-**Endpoint:** `POST /api/articles/search` — body: `{"topic": "your research topic"}`
+## Autoresearch Module
 
-**API Keys:** Semantic Scholar and arXiv do not require keys. OpenAlex is rate-limited but free. No configuration needed.
+The `autoresearch/` directory implements the **autonomous experimentation loop**
+that optimizes a PyTorch relevance model. An AI agent (OpenCode):
+
+1. Edits the training config or model architecture
+2. Trains and evaluates held-out accuracy
+3. Keeps improvements (`git commit`) or discards regressions (`git checkout`)
+4. Logs every experiment to `experiments.jsonl`
+5. Produces a progress curve (`results/running_best.png`)
+
+The model is exposed through a **gated** API — interaction unlocks only once
+accuracy reaches ≥85%. Best achieved: **99.4%** held-out accuracy.
+
+## Sample Dataset
+
+50 influential AI/ML papers (2012–2024) from top venues:
+NeurIPS, ICML, CVPR, Nature, ACL, ICLR, and more (see `data/sample_documents.json.bak`).
 
 ## License
 

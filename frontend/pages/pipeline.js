@@ -4,7 +4,7 @@ const PIPELINE_STAGES = [
   {
     name: "Data Ingestion",
     icon: "📥",
-    description: "Research documents are loaded from sample_documents.json, a curated collection of 50 influential AI/ML papers. The ingestion module reads and validates document structure before passing to the processing stage.",
+    description: "Research documents are loaded from sample_documents.json.bak, a curated collection of 50 influential AI/ML papers. The ingestion module reads and validates document structure before passing to the processing stage.",
     tech: "JSON, Python, FastAPI",
     color: "bg-blue-50 border-blue-200",
     iconBg: "bg-blue-100 text-blue-700",
@@ -125,7 +125,7 @@ export default function Pipeline() {
           <div className="text-sm text-gray-600 leading-relaxed space-y-3">
             <p><strong className="text-gray-900">1.</strong> User submits a research topic via the Dashboard form.</p>
             <p><strong className="text-gray-900">2.</strong> FastAPI creates a <code>ResearchJob</code> in SQLite and spawns a background thread.</p>
-            <p><strong className="text-gray-900">3.</strong> The pipeline reads 50 sample documents from <code>sample_documents.json</code>.</p>
+            <p><strong className="text-gray-900">3.</strong> The pipeline reads 50 sample documents from <code>sample_documents.json.bak</code>.</p>
             <p><strong className="text-gray-900">4.</strong> Documents are filtered by relevance to the topic using keyword overlap scoring.</p>
             <p><strong className="text-gray-900">5.</strong> If PySpark is installed, documents are loaded into a Spark DataFrame for distributed processing. Otherwise, a local Python fallback is used.</p>
             <p><strong className="text-gray-900">6.</strong> NLP extracts keywords, computes TF-based frequency, classifies sentiment, and computes relevance scores.</p>

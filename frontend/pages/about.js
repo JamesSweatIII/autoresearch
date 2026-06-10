@@ -3,31 +3,27 @@ import Card from "../components/ui/Card";
 const FAQ = [
   {
     q: "What is AutoResearch?",
-    a: "AutoResearch is an AI-powered research intelligence platform that automatically ingests, analyzes, and summarizes research documents. It combines PySpark for distributed data processing with NLP techniques for keyword extraction, sentiment analysis, theme detection, and summarization.",
+    a: "AutoResearch is an AI-powered research intelligence platform that gathers academic papers from 4 sources (Semantic Scholar, OpenAlex, arXiv, CrossRef), ranks them by semantic relevance, analyzes sentiment, and trains a PyTorch relevance model via an autonomous AI agent loop.",
   },
   {
-    q: "How does document filtering work?",
-    a: "Documents are scored by calculating term frequency overlap between the user's query and each document's title, abstract, and keywords. Documents with zero overlap are excluded. The remainder are sorted by relevance score.",
+    q: "How does article ranking work?",
+    a: "Articles are ranked by semantic similarity using SentenceTransformer (all-MiniLM-L6-v2). The query and each article's title+abstract are encoded into embeddings, and cosine similarity produces a relevance score with an explanation.",
   },
   {
-    q: "Does it require PySpark?",
-    a: "No. AutoResearch detects PySpark at runtime. If PySpark is installed, documents are loaded into Spark DataFrames for distributed processing. If not, a local Python fallback processes documents in memory. This makes the platform accessible for development and small-scale analysis without a Spark cluster.",
+    q: "What is the autoresearch loop?",
+    a: "An AI coding agent (OpenCode) iterates on a PyTorch training script — editing config, training, evaluating held-out accuracy, and keeping/discarding changes via git. The model is only exposed to users once accuracy reaches ≥85% (best achieved: 99.4%).",
   },
   {
     q: "What data source does the sample use?",
     a: "The included sample dataset contains 50 influential AI/ML research papers from top venues including NeurIPS, ICML, CVPR, Nature, and ACL. Papers span topics from deep learning and reinforcement learning to NLP, computer vision, and AI ethics.",
   },
   {
-    q: "Can I add my own documents?",
-    a: "Yes. The sample_documents.json file can be extended with additional documents following the same schema. Future versions will support PDF ingestion, API-based retrieval, and database connectors.",
-  },
-  {
-    q: "How are keywords extracted?",
-    a: "Keywords are extracted using term frequency analysis with stop-word filtering. The system tokenizes document text, removes common English stop words, counts remaining terms, and returns the top N most frequent terms. This is a TF-based approach that runs both as a PySpark UDF and as a local Python function.",
+    q: "How are articles gathered?",
+    a: "The system queries 4 academic APIs in parallel (Semantic Scholar, OpenAlex, arXiv, CrossRef), deduplicates by DOI and normalized title, then ranks by semantic similarity. No API keys are required.",
   },
   {
     q: "What is the sentiment analysis approach?",
-    a: "Sentiment is classified using a lexicon-based approach. Document text is scanned for positive and negative keyword lists. If positive terms outnumber negative ones, the document is classified as 'positive'; the reverse yields 'negative'; otherwise it is 'neutral'.",
+    a: "Sentiment is classified using a lexicon-based approach (Bing Liu opinion lexicon + TextBlob). Document text is scanned for positive and negative keyword lists. If positive terms outnumber negative ones, the document is classified as 'positive'; the reverse yields 'negative'; otherwise it is 'neutral'.",
   },
 ];
 
@@ -49,13 +45,13 @@ export default function About() {
         </Card>
         <Card className="text-center">
           <div className="text-3xl mb-2">🔧</div>
-          <p className="text-2xl font-bold text-gray-900">6</p>
-          <p className="text-sm text-gray-500">Pipeline Stages</p>
+          <p className="text-2xl font-bold text-gray-900">4</p>
+          <p className="text-sm text-gray-500">Search Sources</p>
         </Card>
         <Card className="text-center">
           <div className="text-3xl mb-2">⚡</div>
-          <p className="text-2xl font-bold text-gray-900">2</p>
-          <p className="text-sm text-gray-500">Processing Modes</p>
+          <p className="text-2xl font-bold text-gray-900">≥85%</p>
+          <p className="text-sm text-gray-500">Accuracy Gate</p>
         </Card>
       </div>
 
@@ -87,13 +83,16 @@ export default function About() {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/health</td><td className="py-2 px-2 text-gray-600">Health check</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/stats</td><td className="py-2 px-2 text-gray-600">Global dataset statistics</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/sources</td><td className="py-2 px-2 text-gray-600">List data sources</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/research/</td><td className="py-2 px-2 text-gray-600">Create research job</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/research/</td><td className="py-2 px-2 text-gray-600">List recent jobs</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/research/{'{id}'}</td><td className="py-2 px-2 text-gray-600">Get job results</td></tr>
-              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/research/{'{id}'}/documents</td><td className="py-2 px-2 text-gray-600">Get documents</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/stats</td><td className="py-2 px-2 text-gray-600">Dataset statistics</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/sources</td><td className="py-2 px-2 text-gray-600">List publication venues</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/papers</td><td className="py-2 px-2 text-gray-600">List/filter papers</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/papers/{'{id}'}</td><td className="py-2 px-2 text-gray-600">Paper detail + similar</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/articles/search</td><td className="py-2 px-2 text-gray-600">Multi-source article search</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/articles/save</td><td className="py-2 px-2 text-gray-600">Save article to database</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/pooler/pool</td><td className="py-2 px-2 text-gray-600">Background article gathering</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">GET</td><td className="py-2 px-2">/api/autoresearch/status</td><td className="py-2 px-2 text-gray-600">Model readiness gate</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/autoresearch/predict</td><td className="py-2 px-2 text-gray-600">Score relevance (query, doc)</td></tr>
+              <tr className="border-b border-gray-100"><td className="py-2 px-2 font-mono text-xs text-primary-600">POST</td><td className="py-2 px-2">/api/autoresearch/train</td><td className="py-2 px-2 text-gray-600">Train model on gathered papers</td></tr>
             </tbody>
           </table>
         </div>
@@ -112,35 +111,45 @@ export default function About() {
 
       <Card title="Project Structure" className="mb-8">
         <pre className="text-xs text-gray-600 leading-relaxed overflow-x-auto">
-{`autoreaserch/
+{`autoresearch/
 ├── backend/
 │   ├── main.py              # FastAPI app entry point
 │   ├── routes/              # API route handlers
-│   │   ├── research_routes.py
-│   │   └── analytics_routes.py
-│   ├── services/            # Business logic (NLP, filtering, scoring)
-│   │   └── research_service.py
-│   ├── models/              # Pydantic schemas
-│   │   └── schemas.py
-│   ├── database/            # SQLAlchemy models & DB setup
-│   │   └── setup.py
-│   └── pipeline/            # PySpark & local processing
-│       └── processing.py
+│   │   ├── article_routes.py
+│   │   ├── autoresearch_routes.py
+│   │   ├── pooler_routes.py
+│   │   └── legacy_routes.py
+│   ├── services/            # Article retrieval, ranking, pooling
+│   │   ├── article_retrieval.py
+│   │   ├── article_pooler.py
+│   │   └── local_llm.py
+│   └── database/
+│       └── setup.py         # SQLAlchemy models
 ├── frontend/
 │   ├── pages/               # Next.js routes
 │   │   ├── index.js         # Landing page
-│   │   ├── dashboard.js     # Research dashboard
-│   │   ├── results/[id].js  # Detailed results
-│   │   ├── pipeline.js      # Architecture page
+│   │   ├── dashboard.js     # Search + pooler
+│   │   ├── interact.js      # Gated model interaction
+│   │   ├── knowledge.js     # Knowledge base
+│   │   ├── pipeline.js      # Architecture
+│   │   ├── results/[id].js  # Research results
+│   │   ├── papers/[id].js   # Paper detail
 │   │   └── about.js         # Documentation
 │   ├── components/          # React components
-│   │   ├── ui/              # Base UI components
-│   │   ├── charts/          # Chart components (Recharts)
-│   │   ├── dashboard/       # Dashboard-specific widgets
+│   │   ├── ui/              # Base UI (Card)
+│   │   ├── charts/          # Recharts visualizations
+│   │   ├── dashboard/       # Dashboard widgets
 │   │   └── layout/          # Navbar, Layout
-│   └── styles/              # Tailwind CSS globals
+│   └── styles/
+├── autoresearch/            # Autonomous model optimization
+│   ├── train_relevance.py
+│   ├── model.py / features.py / infer.py
+│   ├── build_dataset.py / plot.py
+│   └── AGENT_INSTRUCTIONS.md
 ├── data/
-│   └── sample_documents.json # 50 AI/ML research papers
+│   ├── autoresearch.db      # SQLite database
+│   └── sample_documents.json.bak
+├── DEMO.md / FINAL_REPORT.md / PLAN.md / SLIDES.md
 └── README.md`}
         </pre>
       </Card>

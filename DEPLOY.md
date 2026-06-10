@@ -107,7 +107,7 @@ export DATABASE_URL="postgresql://autoresearch:<password>@<rds-endpoint>:5432/au
 export AWS_REGION="us-east-1"
 
 cd /home/ubuntu/autoresearch/backend
-source venv_backup/bin/activate
+source venv/bin/activate
 pip install -r requirements.txt
 
 nohup python worker.py > /var/log/autoresearch-worker.log 2>&1 &
@@ -132,7 +132,7 @@ For local testing without AWS, everything still works with SQLite and no SQS:
 
 ```bash
 cd ~/autoresearch/backend
-source venv_backup/bin/activate
+source venv/bin/activate
 python main.py
 ```
 
@@ -140,10 +140,10 @@ Jobs will be created with status `no_worker` — run the worker locally:
 
 ```bash
 # Terminal 1: API
-cd ~/autoresearch/backend && source venv_backup/bin/activate && python main.py
+cd ~/autoresearch/backend && source venv/bin/activate && python main.py
 
 # Terminal 2: worker (uses the same SQLite DB)
-cd ~/autoresearch/backend && source venv_backup/bin/activate && \
+cd ~/autoresearch/backend && source venv/bin/activate && \
   SQS_QUEUE_URL="<your-queue-url>" python worker.py
 ```
 

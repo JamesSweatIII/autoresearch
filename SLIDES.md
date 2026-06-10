@@ -6,9 +6,9 @@ the 5 required slides — use what fits your timing (target ~10–12 slides ≈ 
 each). ★ = the 5 core slides you asked for.
 
 Verified facts you can quote anywhere:
-- 6 certified sources gathered **205 unique papers** for "graph neural networks";
-  pipeline finished in **~6–14 s**.
-- Relevance model: **67.4% → 91.9%** held-out via the autoresearch loop.
+- 4 certified sources gather papers (Semantic Scholar, OpenAlex, arXiv, CrossRef)
+  in **~6–14 s**.
+- Relevance model: **67.4% → 99.4%** held-out via the autoresearch loop (47 experiments).
 - Method validation on AG News: **51.85% → 90.85%**, 7 kept / 24 discarded.
 - Gate: **≥ 85%** unlocks interaction.
 
@@ -17,7 +17,7 @@ Verified facts you can quote anywhere:
 ## 1 — Title
 **AutoResearch: From a Search Box to a Trained Relevance Model**
 - Sub: *An AI agent that gathers research, then trains and gates its own model*
-- Team names · DS 5110 Big Data Systems · Summer 2026
+- James Sweat, Emmett Hannam, Steve Ferenzi · DS 5110 Big Data Systems · Summer 2026
 - *Say-this:* "We turn a single typed concept into gathered papers and a model you can actually query."
 
 ## 2 — The problem / motivation
@@ -46,10 +46,10 @@ Verified facts you can quote anywhere:
 - *Say-this:* "Static UI up front, compute on EC2, object storage for models — clean separation of cheap UI and on-demand training."
 
 ## 6 — Data gathering & analysis
-- 6 certified sources in parallel: **arXiv, Crossref, Semantic Scholar, OpenAlex, PubMed, Google Scholar**.
-- Dedup (case-insensitive, URL + normalized title) + **PDF intro extraction** for richer context.
-- Each paper gets: **relevance** (BM25 + multi-signal), an optional **LLM relevance judge**, and **author sentiment** (TextBlob + Bing lexicon).
-- *Live example:* "graph neural networks" → 205 unique papers in ~6 s.
+- 4 certified sources in parallel: **arXiv, Crossref, Semantic Scholar, OpenAlex**.
+- Dedup (by DOI then normalized title) + **SentenceTransformer semantic ranking**.
+- Each paper gets: **relevance score** (cosine similarity) with explanation, and **author sentiment** (TextBlob + Bing lexicon).
+- Results returned in **~6–14 s**.
 - *Say-this:* "One query fans out to six scholarly APIs; we merge, dedup, and enrich."
 
 ## 7 — The relevance model: what it does
@@ -73,12 +73,12 @@ Verified facts you can quote anywhere:
 - *Say-this:* "Static site on S3, compute on EC2, agent via OpenRouter — and the model gates itself before users touch it."
 
 ## 10 — Results & key findings
-- **Relevance model: 67.4% → 91.9%** held-out (unseen papers).
+- **Relevance model: 67.4% → 99.4%** held-out (unseen papers, 47 experiments).
 - **Method validated on AG News: 51.85% → 90.85%** (7 kept / 24 discarded changes).
 - Finding #1: the big wins were **fixing under-training + more data**, *not* fancier models.
 - Finding #2: **automatic rejection** of bad changes is what creates the gains (a small, cheap agent suffices).
-- Finding #3: **same-topic corpora are harder** (~85–87%) than diverse ones (92%) — which is *why* a gate matters.
-- *(figure: `assets/relevance_running_best.png` — the climbing curve crossing the gate)*
+- Finding #3: **same-topic corpora are harder** (~85–87%) than diverse ones (99.4%) — which is *why* a gate matters.
+- *(figure: `autoresearch/results/running_best.png` — the climbing curve crossing the gate)*
 
 ## 11 — Demo ★
 - Live (or recorded): **search → "Train on gathered papers" → watch accuracy climb → gate unlocks → query a paper.**

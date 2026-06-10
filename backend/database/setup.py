@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text as sql_text
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DB_PATH = DATA_DIR / "autoresearch.db"
-SAMPLE_DATA_PATH = DATA_DIR / "sample_documents.json"
+SAMPLE_DATA_PATH = DATA_DIR / "sample_documents.json.bak"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
