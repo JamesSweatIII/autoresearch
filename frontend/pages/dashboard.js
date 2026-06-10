@@ -23,6 +23,30 @@ export default function Dashboard() {
   const [poolTotal, setPoolTotal] = useState(0);
   const [poolCurrent, setPoolCurrent] = useState("");
   const [poolContext, setPoolContext] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [deletingGroup, setDeletingGroup] = useState(null);
+
+  const fetchGroups = async () => {
+    try {
+      const res = await fetch("/api/groups");
+      if (res.ok) {
+        const d = await res.json();
+        setGroups(d.groups || []);
+      }
+    } catch {}
+  };
+
+  useEffect(() => { fetchGroups(); }, []);
+
+  const deleteGroup = async (id) => {
+    if (!confirm("Delete this research group and its papers?")) return;
+    setDeletingGroup(id);
+    try {
+      await fetch(`/api/groups/${id}`, { method: "DELETE" });
+      setGroups(prev => prev.filter(g => g.id !== id));
+    } catch {}
+    setDeletingGroup(null);
+  };
 
   const searchArticles = async (e) => {
     e.preventDefault();
@@ -181,53 +205,68 @@ export default function Dashboard() {
         )}
 
         {arResults.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">{arResults.length} results found — ranked by similarity</p>
-            {arResults.map((a, i) => {
-              const isExpanded = arExpanded[a.id];
-              const isSaving = arSaving[a.id];
-              const hasLongAbstract = a.abstract && a.abstract.length > 200;
-              return (
-                <div key={a.id || i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <a href="#" onClick={(e) => { e.preventDefault(); toggleExpand(a.id, arExpanded, setArExpanded); }} className="text-sm font-medium text-primary-700 hover:text-primary-800 line-clamp-2 cursor-pointer">
-                          {a.title}
-                        </a>
-                        <button onClick={() => saveArticle(a)} disabled={isSaving} className={`shrink-0 px-2 py-0.5 text-xs font-medium rounded transition-colors ${isSaving ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"}`}>
-                          {isSaving ? "..." : "+ Save"}
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {a.authors?.slice(0, 3).join(", ")}{a.authors?.length > 3 ? " et al." : ""}
-                        {a.year && ` · ${a.year}`}
-                        {a.citationCount != null && ` · ${a.citationCount} cites`}
-                      </p>
-                      {a.abstract && (
-                        <div onClick={() => toggleExpand(a.id, arExpanded, setArExpanded)} className="cursor-pointer">
-                          <p className={`text-xs text-gray-500 mt-1 ${isExpanded ? "" : "line-clamp-2"}`}>{a.abstract}</p>
-                          {hasLongAbstract && (
-                            <span className="text-xs text-primary-500 hover:text-primary-700 mt-0.5 inline-block">
-                              {isExpanded ? "Show less" : "Show more"}
+          <div>
+            <p className="text-xs text-gray-400 mb-3">{arResults.length} results found — showing top 20 by relevance</p>
+            <div className="max-h-96 overflow-y-auto overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 pr-2 font-medium text-gray-500 text-xs uppercase tracking-wider w-8">#</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-500 text-xs uppercase tracking-wider">Title / Authors</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-500 text-xs uppercase tracking-wider w-20">Source</th>
+                    <th className="text-center py-2 px-2 font-medium text-gray-500 text-xs uppercase tracking-wider w-16">Score</th>
+                    <th className="text-center py-2 pl-2 font-medium text-gray-500 text-xs uppercase tracking-wider w-16">Save</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arResults.slice(0, 20).map((a, i) => {
+                    const isExpanded = arExpanded[a.id];
+                    const isSaving = arSaving[a.id];
+                    const hasLongAbstract = a.abstract && a.abstract.length > 200;
+                    return (
+                      <tr key={a.id || i} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-2 align-top text-xs text-gray-400">{i + 1}</td>
+                        <td className="py-3 px-2">
+                          <div>
+                            <button onClick={() => toggleExpand(a.id, arExpanded, setArExpanded)} className="text-sm font-medium text-primary-700 hover:text-primary-800 text-left">
+                              {a.title}
+                            </button>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {a.authors?.slice(0, 3).join(", ")}{a.authors?.length > 3 ? " et al." : ""}
+                              {a.year && ` · ${a.year}`}
+                              {a.citationCount != null && ` · ${a.citationCount} cites`}
+                            </p>
+                            {isExpanded && a.abstract && (
+                              <p className="text-xs text-gray-500 mt-1">{a.abstract}</p>
+                            )}
+                            {!isExpanded && hasLongAbstract && (
+                              <button onClick={() => toggleExpand(a.id, arExpanded, setArExpanded)} className="text-xs text-primary-500 hover:text-primary-700 mt-0.5">
+                                Show abstract
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 align-top">
+                          <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 capitalize whitespace-nowrap">{a.source?.replace("_", " ")}</span>
+                        </td>
+                        <td className="py-3 px-2 align-top text-center">
+                          {a.relevanceScore != null && (
+                            <span className={`text-xs font-semibold ${a.relevanceScore >= 0.7 ? 'text-green-600' : a.relevanceScore >= 0.4 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                              {a.relevanceScore.toFixed(2)}
                             </span>
                           )}
-                        </div>
-                      )}
-                      {a.reasonSelected && <p className="text-xs text-gray-400 mt-1 italic">{a.reasonSelected}</p>}
-                    </div>
-                    <div className="flex flex-col items-end shrink-0 gap-1">
-                      {a.relevanceScore != null && (
-                        <span className={`text-xs font-semibold ${a.relevanceScore >= 0.7 ? 'text-green-600' : a.relevanceScore >= 0.4 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                          {a.relevanceScore.toFixed(2)}
-                        </span>
-                      )}
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 capitalize">{a.source?.replace("_", " ")}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                        </td>
+                        <td className="py-3 pl-2 align-top text-center">
+                          <button onClick={() => saveArticle(a)} disabled={isSaving} className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${isSaving ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"}`}>
+                            {isSaving ? "..." : "+ Save"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </Card>
@@ -268,6 +307,30 @@ export default function Dashboard() {
           <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm">
             <p className="font-medium text-green-800">Pooled {poolResult.new_articles} new articles</p>
             <p className="text-xs text-green-600 mt-0.5">{poolResult.duplicates_skipped} duplicates skipped across {poolResult.topics_searched} topics</p>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Research Groups" subtitle="Manage your saved paper groups" className="mb-8">
+        {groups.length === 0 ? (
+          <p className="text-sm text-gray-400">No research groups yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {groups.map(g => (
+              <div key={g.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
+                  <p className="text-xs text-gray-400">{g.paper_count} papers</p>
+                </div>
+                <button
+                  onClick={() => deleteGroup(g.id)}
+                  disabled={deletingGroup === g.id}
+                  className="ml-3 shrink-0 px-2.5 py-1 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingGroup === g.id ? "..." : "Delete"}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </Card>

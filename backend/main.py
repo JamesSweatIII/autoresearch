@@ -9,6 +9,7 @@ from routes.legacy_routes import router as legacy_router
 from routes.pooler_routes import router as pooler_router
 from routes.autoresearch_routes import router as autoresearch_router
 from routes.group_routes import router as group_router
+from routes.research_routes import router as research_router
 
 app = FastAPI(
     title="AutoResearch API",
@@ -29,6 +30,7 @@ app.include_router(legacy_router)
 app.include_router(pooler_router)
 app.include_router(autoresearch_router)
 app.include_router(group_router)
+app.include_router(research_router)
 
 
 @app.on_event("startup")

@@ -22,6 +22,8 @@ def list_groups():
         result = []
         for g in groups:
             count = db.query(PaperGroup).filter(PaperGroup.group_id == g.id).count()
+            if count == 0:
+                continue
             result.append({
                 "id": g.id,
                 "name": g.name,
@@ -106,6 +108,21 @@ def add_paper_to_group(group_id: int, body: AddPaperBody):
             db.add(pg)
             db.commit()
         return {"ok": True}
+    finally:
+        db.close()
+
+
+@router.delete("/api/groups/{group_id}")
+def delete_group(group_id: int):
+    db = SessionLocal()
+    try:
+        g = db.query(ResearchGroup).filter(ResearchGroup.id == group_id).first()
+        if not g:
+            raise HTTPException(status_code=404, detail="Group not found")
+        db.query(PaperGroup).filter(PaperGroup.group_id == group_id).delete()
+        db.delete(g)
+        db.commit()
+        return {"message": "Group deleted"}
     finally:
         db.close()
 

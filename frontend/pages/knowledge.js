@@ -340,16 +340,10 @@ export default function KnowledgeBase() {
 
       {stats && (
         <div className="mb-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="sm:col-span-3 text-center py-6">
-              <p className="text-5xl font-bold text-gray-900">{stats.total_papers}</p>
-              <p className="text-sm text-gray-500 mt-1">Total Papers</p>
-            </Card>
-            <Card className="text-center py-4 flex flex-col justify-center">
-              <p className="text-xl font-bold text-gray-400">{stats.total_jobs}</p>
-              <p className="text-xs text-gray-400">Research Jobs</p>
-            </Card>
-          </div>
+          <Card className="text-center py-6">
+            <p className="text-5xl font-bold text-gray-900">{stats.total_papers}</p>
+            <p className="text-sm text-gray-500 mt-1">Total Papers</p>
+          </Card>
         </div>
       )}
 
