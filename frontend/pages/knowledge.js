@@ -31,8 +31,14 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
   const [newGroupName, setNewGroupName] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const paperGroupIds = new Set();
+  if (p?.id) {
+    groups.forEach(g => {
+      if (g.paper_ids?.includes?.(p.id)) paperGroupIds.add(g.id);
+    });
+  }
   const filteredGroups = groups.filter(g =>
-    g.name.toLowerCase().includes(groupSearch.toLowerCase())
+    !paperGroupIds.has(g.id) && g.name.toLowerCase().includes(groupSearch.toLowerCase())
   );
 
   async function handleCreateAndAdd() {
@@ -121,30 +127,23 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
                 />
                 <div className="max-h-40 overflow-y-auto space-y-0.5">
                   {filteredGroups.length > 0 ? filteredGroups.map(g => {
-                    const inGroup = g.paper_ids?.has?.(p.id) || g.paper_ids?.includes?.(p.id);
                     return (
                       <button
                         key={g.id}
                         onClick={async () => {
-                          if (inGroup) {
-                            await fetch(`/api/groups/${g.id}/papers/${p.id}`, { method: "DELETE" });
-                          } else {
-                            await fetch(`/api/groups/${g.id}/papers`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ paper_id: p.id }),
-                            });
-                          }
+                          await fetch(`/api/groups/${g.id}/papers`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ paper_id: p.id }),
+                          });
                           if (onAddToGroup) onAddToGroup(g.id, p.id);
                           setGroupSearch("");
                           setShowGroupPicker(false);
                         }}
-                        className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100 flex items-center gap-2 ${
-                          inGroup ? 'text-yellow-700' : 'text-gray-700'
-                        }`}
+                        className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100 flex items-center gap-2 text-gray-700"
                       >
-                        <svg className="w-3 h-3 shrink-0" fill={inGroup ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        <svg className="w-3 h-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         {g.name}
                       </button>
