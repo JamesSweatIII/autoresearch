@@ -2,11 +2,36 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Card from "../components/ui/Card";
 
+const colorPalette = [
+  { bg: "bg-red-100", text: "text-red-700" },
+  { bg: "bg-blue-100", text: "text-blue-700" },
+  { bg: "bg-green-100", text: "text-green-700" },
+  { bg: "bg-purple-100", text: "text-purple-700" },
+  { bg: "bg-orange-100", text: "text-orange-700" },
+  { bg: "bg-teal-100", text: "text-teal-700" },
+  { bg: "bg-pink-100", text: "text-pink-700" },
+  { bg: "bg-indigo-100", text: "text-indigo-700" },
+  { bg: "bg-cyan-100", text: "text-cyan-700" },
+  { bg: "bg-amber-100", text: "text-amber-700" },
+  { bg: "bg-lime-100", text: "text-lime-700" },
+  { bg: "bg-rose-100", text: "text-rose-700" },
+];
+
+function getSourceColor(source) {
+  let hash = 0;
+  for (let i = 0; i < source.length; i++) {
+    hash = source.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colorPalette[Math.abs(hash) % colorPalette.length];
+}
+
 export default function KnowledgeBase() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [sourceType, setSourceType] = useState("");
+  const [sourceTypeFilter, setSourceTypeFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [siteOptions, setSiteOptions] = useState([]);
   const [page, setPage] = useState(1);
   const [stats, setStats] = useState(null);
   const limit = 20;
@@ -19,15 +44,28 @@ export default function KnowledgeBase() {
   }, []);
 
   useEffect(() => {
+    if (sourceTypeFilter === "web") {
+      fetch(`/api/sources?source_type=web`)
+        .then((r) => r.json())
+        .then((d) => setSiteOptions(d.sources || []))
+        .catch(() => {});
+    } else {
+      setSiteOptions([]);
+      setSourceFilter("");
+    }
+  }, [sourceTypeFilter]);
+
+  useEffect(() => {
     setLoading(true);
     setPage(1);
-  }, [search, sourceType]);
+  }, [search, sourceTypeFilter, sourceFilter]);
 
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    if (sourceType) params.set("source_type", sourceType);
+    if (sourceTypeFilter) params.set("source_type", sourceTypeFilter);
+    if (sourceFilter) params.set("source", sourceFilter);
     params.set("limit", String(limit));
     params.set("offset", String((page - 1) * limit));
 
@@ -36,7 +74,7 @@ export default function KnowledgeBase() {
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [search, sourceType, page]);
+  }, [search, sourceTypeFilter, sourceFilter, page]);
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
 
@@ -45,7 +83,7 @@ export default function KnowledgeBase() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Knowledge Base</h1>
         <p className="text-gray-500 mt-1">
-          All papers discovered across research jobs — sample data and web results combined
+          All papers organized by their original source — crossref, openalex, arxiv, semantic scholar, and more
         </p>
       </div>
 
@@ -55,14 +93,12 @@ export default function KnowledgeBase() {
             <p className="text-2xl font-bold text-gray-900">{stats.total_papers}</p>
             <p className="text-xs text-gray-500">Total Papers</p>
           </Card>
-          <Card className="text-center py-4">
-            <p className="text-2xl font-bold text-green-600">{stats.sample_papers}</p>
-            <p className="text-xs text-gray-500">Sample Papers</p>
-          </Card>
-          <Card className="text-center py-4">
-            <p className="text-2xl font-bold text-blue-600">{stats.web_papers}</p>
-            <p className="text-xs text-gray-500">Web Discovered</p>
-          </Card>
+          {Object.entries(stats.source_distribution || {}).slice(0, 3).map(([src, count]) => (
+            <Card key={src} className="text-center py-4">
+              <p className="text-2xl font-bold text-primary-600">{count}</p>
+              <p className="text-xs text-gray-500 capitalize">{src.replace(/_/g, ' ')}</p>
+            </Card>
+          ))}
           <Card className="text-center py-4">
             <p className="text-2xl font-bold text-gray-900">{stats.total_jobs}</p>
             <p className="text-xs text-gray-500">Research Jobs</p>
@@ -82,14 +118,26 @@ export default function KnowledgeBase() {
             />
           </div>
           <select
-            value={sourceType}
-            onChange={(e) => setSourceType(e.target.value)}
+            value={sourceTypeFilter}
+            onChange={(e) => setSourceTypeFilter(e.target.value)}
             className="input-field sm:w-48"
           >
             <option value="">All sources</option>
-            <option value="sample">Sample data</option>
-            <option value="web">Web discovered</option>
+            <option value="sample">Sample</option>
+            <option value="web">Local DB</option>
           </select>
+          {sourceTypeFilter === "web" && siteOptions.length > 0 && (
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="input-field sm:w-48"
+            >
+              <option value="">All sites</option>
+              {siteOptions.map((s) => (
+                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          )}
         </div>
       </Card>
 
@@ -128,19 +176,19 @@ export default function KnowledgeBase() {
           </div>
           <div className="space-y-3">
             {data.papers.map((p) => (
-              <div key={p.id} className="card hover:shadow-md transition-shadow">
+              <Link key={p.id} href={`/papers/${p.id}`} className="block card hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                        p.source_type === "web"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}>
-                        {p.source_type === "web" ? "WEB" : "SAMPLE"}
-                      </span>
-                      <span className="text-xs text-gray-400">{p.source}</span>
-                      <span className="text-xs text-gray-400">({p.year})</span>
+                      {(() => {
+                        const c = getSourceColor(p.source || p.source_type);
+                        return (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${c.bg} ${c.text}`}>
+                            {p.source || p.source_type}
+                          </span>
+                        );
+                      })()}
+                      <span className="text-xs text-gray-400">{p.year}</span>
                     </div>
                     <h3 className="font-semibold text-gray-900 truncate">{p.title}</h3>
                     {p.authors && (
@@ -160,17 +208,12 @@ export default function KnowledgeBase() {
                     )}
                   </div>
                   <div className="flex flex-col items-center gap-1 shrink-0">
-                    <Link
-                      href={`/papers/${p.id}`}
-                      className="text-xs font-medium text-primary-600 hover:text-primary-700 px-2 py-1 rounded hover:bg-primary-50 transition-colors"
-                    >
-                      View
-                    </Link>
                     {p.url && (
                       <a
                         href={p.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -180,7 +223,7 @@ export default function KnowledgeBase() {
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </>

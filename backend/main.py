@@ -1,10 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database.setup import init_db
-from routes.research_routes import router as research_router
-from routes.analytics_routes import router as analytics_router
-from routes.search_routes import router as search_router
-from routes.model_routes import router as model_router
+from routes.article_routes import router as article_router
+from routes.legacy_routes import router as legacy_router
+from routes.pooler_routes import router as pooler_router
 
 app = FastAPI(
     title="AutoResearch API",
@@ -20,10 +22,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(research_router)
-app.include_router(analytics_router)
-app.include_router(search_router)
-app.include_router(model_router)
+app.include_router(article_router)
+app.include_router(legacy_router)
+app.include_router(pooler_router)
 
 
 @app.on_event("startup")

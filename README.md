@@ -92,6 +92,32 @@ autoreaserch/
 └── README.md
 ```
 
+## Article Retrieval Pipeline
+
+The article retrieval system (`backend/services/article_retrieval.py`) finds relevant academic articles by:
+
+1. **Query Expansion** — Generates 6–10 academic queries from a user topic (surveys, keyword combinations, phased variants).
+2. **Multi-Source Search** — Queries **Semantic Scholar**, **OpenAlex**, and **arXiv** in parallel via their public APIs.
+3. **Normalization** — Each source's response is mapped to a `ResearchArticle` dataclass (title, authors, year, abstract, DOI, citation count, URL).
+4. **Deduplication** — Removes duplicates by DOI first, then by normalized title.
+5. **Ranking** — Scores each article using the weighted formula:
+
+   | Component | Weight | Description |
+   |-----------|--------|-------------|
+   | Semantic similarity | 0.45 | Keyword overlap (swappable with dense embeddings) |
+   | Title keyword match | 0.20 | Fraction of topic keywords in the title |
+   | Abstract keyword match | 0.15 | Fraction of topic keywords in the abstract |
+   | Citation count | 0.10 | Log-normalized citation count |
+   | Recency | 0.10 | Exponential decay from current year |
+
+   Each result includes a `reasonSelected` field explaining its ranking.
+
+6. **Top 10** — The highest-scoring unique articles are returned.
+
+**Endpoint:** `POST /api/articles/search` — body: `{"topic": "your research topic"}`
+
+**API Keys:** Semantic Scholar and arXiv do not require keys. OpenAlex is rate-limited but free. No configuration needed.
+
 ## License
 
 MIT
