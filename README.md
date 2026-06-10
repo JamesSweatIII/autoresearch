@@ -31,9 +31,9 @@ App runs at `http://localhost:3000`.
 User → Dashboard (Next.js) → API (FastAPI) → Article Retrieval (4 sources)
          ↓                        ↓                    ↓
       Results ←──── SQLite Database ←─── Semantic Ranking + Sentiment
-                                            ↓
-                                     Autoresearch Torch Model
-                                     (gated at ≥85% accuracy)
+         ↓                        ↓
+   Research Groups          Autoresearch Torch Model
+   (organize papers)        (gated at ≥85% accuracy)
 ```
 
 ### Pipeline
@@ -63,6 +63,15 @@ User → Dashboard (Next.js) → API (FastAPI) → Article Retrieval (4 sources)
 | GET | `/api/sources` | List all publication venues |
 | GET | `/api/papers` | List/filter papers |
 | GET | `/api/papers/{id}` | Paper detail + similar papers |
+| PATCH | `/api/papers/{id}/save` | Toggle saved/bookmark status |
+| GET | `/api/groups` | List research groups |
+| POST | `/api/groups` | Create research group |
+| GET | `/api/groups/{id}` | Get group with papers |
+| DELETE | `/api/groups/{id}` | Delete group |
+| POST | `/api/groups/{id}/papers` | Add paper to group |
+| DELETE | `/api/groups/{id}/papers/{paper_id}` | Remove paper from group |
+| GET | `/api/research/` | List research jobs |
+| DELETE | `/api/research/{id}` | Delete research job |
 | POST | `/api/articles/search` | Multi-source article search |
 | POST | `/api/articles/save` | Save article to database |
 | POST | `/api/pooler/pool` | Background article gathering |
@@ -82,8 +91,10 @@ autoresearch/
 │   ├── routes/
 │   │   ├── article_routes.py    # POST /api/articles/search, /save
 │   │   ├── autoresearch_routes.py  # GET/POST /api/autoresearch/*
+│   │   ├── group_routes.py      # CRUD /api/groups, add/remove papers
+│   │   ├── legacy_routes.py     # GET /api/stats, /api/papers, /api/sources
 │   │   ├── pooler_routes.py     # POST /api/pooler/pool
-│   │   └── legacy_routes.py     # GET /api/stats, /api/papers, /api/sources
+│   │   └── research_routes.py   # GET/DELETE /api/research
 │   └── services/
 │       ├── article_retrieval.py # Multi-source search + semantic ranking
 │       ├── article_pooler.py    # Background topic-based article gathering
