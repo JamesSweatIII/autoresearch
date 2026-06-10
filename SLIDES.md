@@ -8,7 +8,7 @@ each). ★ = the 5 core slides you asked for.
 Verified facts you can quote anywhere:
 - 4 certified sources gather papers (Semantic Scholar, OpenAlex, arXiv, CrossRef)
   in **~6–14 s**.
-- Relevance model: **67.4% → 99.4%** held-out via the autoresearch loop (47 experiments).
+- Relevance model: **67.4% → 91.9%** held-out via the autoresearch loop (47 experiments).
 - Method validation on AG News: **51.85% → 90.85%**, 7 kept / 24 discarded.
 - Gate: **≥ 85%** unlocks interaction.
 
@@ -73,11 +73,11 @@ Verified facts you can quote anywhere:
 - *Say-this:* "Static site on S3, compute on EC2, agent via OpenRouter — and the model gates itself before users touch it."
 
 ## 10 — Results & key findings
-- **Relevance model: 67.4% → 99.4%** held-out (unseen papers, 47 experiments).
+- **Relevance model: 67.4% → 91.9%** held-out (unseen papers, 47 experiments).
 - **Method validated on AG News: 51.85% → 90.85%** (7 kept / 24 discarded changes).
 - Finding #1: the big wins were **fixing under-training + more data**, *not* fancier models.
 - Finding #2: **automatic rejection** of bad changes is what creates the gains (a small, cheap agent suffices).
-- Finding #3: **same-topic corpora are harder** (~85–87%) than diverse ones (99.4%) — which is *why* a gate matters.
+- Finding #3: **same-topic corpora are harder** (~85–87%) than diverse ones (91.9%) — which is *why* a gate matters.
 - *(figure: `autoresearch/results/running_best.png` — the climbing curve crossing the gate)*
 
 ## 11 — Demo ★

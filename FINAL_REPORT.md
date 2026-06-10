@@ -190,7 +190,7 @@ after 47 experiments:
 | Metric | Value |
 |---|---|
 | Baseline accuracy (linear, 1 epoch) | **67.40%** |
-| Final accuracy | **99.40%** |
+| Final accuracy | **91.90%** |
 | Crossed the 85% gate at | exp 1 (epochs 1→15 ⇒ 91.21%) |
 | Gate / ready threshold | 85% ⇒ `ready = True` |
 | Train / test pairs | 879 / 273 (test = unseen papers) |

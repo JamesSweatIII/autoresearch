@@ -11,7 +11,7 @@ const FAQ = [
   },
   {
     q: "What is the autoresearch loop?",
-    a: "An AI coding agent (OpenCode) iterates on a PyTorch training script — editing config, training, evaluating held-out accuracy, and keeping/discarding changes via git. The model is only exposed to users once accuracy reaches ≥85% (best achieved: 99.4%).",
+    a: "An AI coding agent (OpenCode) iterates on a PyTorch training script — editing config, training, evaluating held-out accuracy, and keeping/discarding changes via git. The model is only exposed to users once accuracy reaches ≥85% (best achieved: 91.9%).",
   },
   {
     q: "What data source does the sample use?",

@@ -45,7 +45,7 @@ Open **http://localhost:3000**.
     seconds. The status card polls and updates live (accuracy vs. the 85% gate).
 3. **See it gated** — interaction unlocks **only at ≥ 85% held-out accuracy**:
    - **Diverse corpus** (e.g. the default model trained on the mixed sample set):
-      **99.4%** → unlocked. Type a topic + paper and get a relevance score; a
+      **91.9%** → unlocked. Type a topic + paper and get a relevance score; a
       matching paper scores ~0.99, an off-topic one ~0.00.
    - **Single-topic live search** (all papers about one topic): lands **~85–87%**
       → **stays locked**. This is the gate doing its job — a model that can't
@@ -57,11 +57,11 @@ Open **http://localhost:3000**.
 - The **fast background trainer** uses a known-good config (seconds). The separate
   **OpenCode keep/discard loop** (`autoresearch/train_relevance.py` +
   `AGENT_INSTRUCTIONS.md`) is the iterative "autoresearch method" that produces the
-  progress curve (`autoresearch/results/running_best.png`, 67.4% → 99.4%).
+  progress curve (`autoresearch/results/running_best.png`, 67.4% → 91.9%).
 
 ## Reset to a clean state (optional, before recording)
 ```bash
-# make the default model "ready" (diverse sample corpus, 99.4%)
+# make the default model "ready" (diverse sample corpus, 91.9%)
 cd backend && source .venv/bin/activate
 python -c "import sys,json;sys.path.insert(0,'.');sys.path.insert(0,'../autoresearch');import trainer_api;\
 p=[{'title':x['title'],'abstract':x.get('abstract',''),'keywords':x.get('keywords',[])} for x in json.load(open('../data/sample_documents.json.bak'))];\

@@ -143,7 +143,7 @@ that optimizes a PyTorch relevance model. An AI agent (OpenCode):
 5. Produces a progress curve (`results/running_best.png`)
 
 The model is exposed through a **gated** API — interaction unlocks only once
-accuracy reaches ≥85%. Best achieved: **99.4%** held-out accuracy.
+accuracy reaches ≥85%. Best achieved: **91.9%** held-out accuracy.
 
 ## Sample Dataset
 
