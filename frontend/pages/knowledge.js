@@ -68,7 +68,7 @@ export default function KnowledgeBase() {
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-    }, [search, sourceFilter, page]);
+    }, [search, sourceFilter, savedOnly, page]);
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
 
@@ -82,8 +82,10 @@ export default function KnowledgeBase() {
         body: JSON.stringify({ saved: newVal }),
       });
       if (res.ok) {
-        p.saved = newVal;
-        setData(prev => ({ ...prev }));
+        setData(prev => ({
+          ...prev,
+          papers: prev.papers.map(pp => pp.id === p.id ? { ...pp, saved: newVal } : pp)
+        }));
       }
     } catch {}
     setSaving(prev => ({ ...prev, [p.id]: false }));

@@ -8,6 +8,7 @@ export default function PaperDetail() {
   const { id } = router.query;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -18,6 +19,23 @@ export default function PaperDetail() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function toggleSaved() {
+    if (!data?.paper) return;
+    const newVal = !data.paper.saved;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/papers/${id}/save`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saved: newVal }),
+      });
+      if (res.ok) {
+        setData(prev => prev ? { ...prev, paper: { ...prev.paper, saved: newVal } } : prev);
+      }
+    } catch {}
+    setSaving(false);
+  }
 
   if (loading) {
     return (
@@ -57,7 +75,22 @@ export default function PaperDetail() {
             {paper.source_type === "web" ? "WEB" : "SAMPLE"}
           </span>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900">{paper.title}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">{paper.title}</h1>
+              <button
+                onClick={toggleSaved}
+                disabled={saving}
+                className={`shrink-0 p-2 rounded transition-colors ${
+                  paper.saved
+                    ? 'text-yellow-500 hover:text-yellow-600'
+                    : 'text-gray-300 hover:text-yellow-400'
+                } disabled:opacity-50`}
+              >
+                <svg className="w-5 h-5" fill={paper.saved ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              </button>
+            </div>
             <p className="text-sm text-gray-500 mt-2">
               {paper.authors || "Unknown authors"} &mdash; {paper.source || "Unknown source"} ({paper.year})
             </p>

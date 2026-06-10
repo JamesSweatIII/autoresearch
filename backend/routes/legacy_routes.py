@@ -132,6 +132,7 @@ def get_paper(paper_id: int):
                 "keywords": paper.keywords or [],
                 "url": fmt_url(paper.url, paper.source_type, paper.source),
                 "source_type": paper.source_type,
+                "saved": bool(paper.saved),
             },
             "similar_papers": [
                 {
