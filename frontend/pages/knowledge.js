@@ -28,10 +28,14 @@ function getSourceColor(source) {
 export default function KnowledgeBase() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const SOURCE_OPTIONS = [
+    { id: "semantic_scholar", label: "Semantic Scholar" },
+    { id: "openalex", label: "OpenAlex" },
+    { id: "arxiv", label: "arXiv" },
+    { id: "crossref", label: "CrossRef" },
+  ];
   const [search, setSearch] = useState("");
-  const [sourceTypeFilter, setSourceTypeFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [siteOptions, setSiteOptions] = useState([]);
+  const [sourceFilter, setSourceFilter] = useState([]);
   const [page, setPage] = useState(1);
   const [stats, setStats] = useState(null);
   const limit = 20;
@@ -44,28 +48,15 @@ export default function KnowledgeBase() {
   }, []);
 
   useEffect(() => {
-    if (sourceTypeFilter === "web") {
-      fetch(`/api/sources?source_type=web`)
-        .then((r) => r.json())
-        .then((d) => setSiteOptions(d.sources || []))
-        .catch(() => {});
-    } else {
-      setSiteOptions([]);
-      setSourceFilter("");
-    }
-  }, [sourceTypeFilter]);
-
-  useEffect(() => {
     setLoading(true);
     setPage(1);
-  }, [search, sourceTypeFilter, sourceFilter]);
+  }, [search, sourceFilter]);
 
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    if (sourceTypeFilter) params.set("source_type", sourceTypeFilter);
-    if (sourceFilter) params.set("source", sourceFilter);
+    if (sourceFilter.length > 0) params.set("source", sourceFilter.join(","));
     params.set("limit", String(limit));
     params.set("offset", String((page - 1) * limit));
 
@@ -74,7 +65,7 @@ export default function KnowledgeBase() {
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [search, sourceTypeFilter, sourceFilter, page]);
+    }, [search, sourceFilter, page]);
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
 
@@ -83,26 +74,22 @@ export default function KnowledgeBase() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Knowledge Base</h1>
         <p className="text-gray-500 mt-1">
-          All papers organized by their original source — crossref, openalex, arxiv, semantic scholar, and more
+          Browse and search research papers
         </p>
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <Card className="text-center py-4">
-            <p className="text-2xl font-bold text-gray-900">{stats.total_papers}</p>
-            <p className="text-xs text-gray-500">Total Papers</p>
-          </Card>
-          {Object.entries(stats.source_distribution || {}).slice(0, 3).map(([src, count]) => (
-            <Card key={src} className="text-center py-4">
-              <p className="text-2xl font-bold text-primary-600">{count}</p>
-              <p className="text-xs text-gray-500 capitalize">{src.replace(/_/g, ' ')}</p>
+        <div className="mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="sm:col-span-3 text-center py-6">
+              <p className="text-5xl font-bold text-gray-900">{stats.total_papers}</p>
+              <p className="text-sm text-gray-500 mt-1">Total Papers</p>
             </Card>
-          ))}
-          <Card className="text-center py-4">
-            <p className="text-2xl font-bold text-gray-900">{stats.total_jobs}</p>
-            <p className="text-xs text-gray-500">Research Jobs</p>
-          </Card>
+            <Card className="text-center py-4 flex flex-col justify-center">
+              <p className="text-xl font-bold text-gray-400">{stats.total_jobs}</p>
+              <p className="text-xs text-gray-400">Research Jobs</p>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -117,27 +104,30 @@ export default function KnowledgeBase() {
               className="input-field"
             />
           </div>
-          <select
-            value={sourceTypeFilter}
-            onChange={(e) => setSourceTypeFilter(e.target.value)}
-            className="input-field sm:w-48"
-          >
-            <option value="">All sources</option>
-            <option value="sample">Sample</option>
-            <option value="web">Local DB</option>
-          </select>
-          {sourceTypeFilter === "web" && siteOptions.length > 0 && (
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="input-field sm:w-48"
-            >
-              <option value="">All sites</option>
-              {siteOptions.map((s) => (
-                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">Sources:</span>
+            {SOURCE_OPTIONS.map((s) => {
+              const selected = sourceFilter.includes(s.id);
+              const c = getSourceColor(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setSourceFilter(prev =>
+                      prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id]
+                    );
+                  }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                    selected
+                      ? `${c.bg} ${c.text} ring-2 ring-offset-1 ring-current`
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 

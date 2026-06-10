@@ -11,6 +11,7 @@ class PoolRequest(BaseModel):
     topics: Optional[List[str]] = None
     max_per_topic: int = 50
     topic_fraction: float = 0.5
+    context: str = ""
 
 
 class PoolResponse(BaseModel):
@@ -24,7 +25,7 @@ class PoolResponse(BaseModel):
 def run_pooler(req: PoolRequest):
     if req.max_per_topic < 1 or req.max_per_topic > 200:
         raise HTTPException(400, "max_per_topic must be between 1 and 200")
-    result = start_pooler(topics=req.topics, max_per_topic=req.max_per_topic, topic_fraction=req.topic_fraction)
+    result = start_pooler(topics=req.topics, max_per_topic=req.max_per_topic, topic_fraction=req.topic_fraction, context=req.context)
     if "error" in result:
         raise HTTPException(400, result["error"])
     return result

@@ -1,0 +1,33 @@
+{
+  "best_accuracy": 0.994,
+  "ready": true,
+  "threshold": 0.5,
+  "ready_threshold": 0.85,
+  "feature_names": [
+    "word_overlap",
+    "title_match",
+    "abstract_match",
+    "bigram_overlap",
+    "trigram_overlap",
+    "quoted_match",
+    "query_len",
+    "doc_len",
+    "title_individual",
+    "coverage"
+  ],
+  "config": {
+    "hidden_dim": 0,
+    "dropout": 0.0,
+    "lr": 0.05,
+    "weight_decay": 0.0,
+    "epochs": 15,
+    "batch_size": 64,
+    "test_frac": 0.25,
+    "threshold": 0.5,
+    "seed": 0
+  },
+  "topic": "",
+  "n_papers": 107,
+  "n_pairs": 663,
+  "trained_seconds": 0.23
+}

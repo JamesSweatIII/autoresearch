@@ -7,6 +7,7 @@ from services.article_retrieval import (
     find_local_articles,
     ResearchArticle,
 )
+from database.setup import SessionLocal, Paper
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
@@ -47,15 +48,47 @@ class SaveArticleRequest(BaseModel):
     doi: Optional[str] = None
 
 
+def _auto_save_articles(articles):
+    try:
+        db = SessionLocal()
+        try:
+            for a in articles:
+                if not a.title.strip():
+                    continue
+                dup = db.query(Paper).filter(Paper.title == a.title.strip()).first()
+                if dup:
+                    continue
+                db.add(Paper(
+                    title=a.title.strip(),
+                    authors=", ".join(a.authors),
+                    year=a.year or 2024,
+                    abstract=a.abstract or "",
+                    source=a.source or "web",
+                    url=a.url or "",
+                    source_type="web",
+                ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+
 @router.post("/search", response_model=ArticleSearchResponse)
 def search_articles(req: ArticleSearchRequest):
     if not req.topic.strip():
         return ArticleSearchResponse(topic=req.topic, sources=req.sources)
 
-    if req.sources == ["local"]:
-        results = find_local_articles(req.topic.strip())
-    else:
-        results = find_relevant_articles(req.topic.strip(), sources=req.sources)
+    has_local = "local" in req.sources
+    external = [s for s in req.sources if s != "local"]
+
+    results = []
+    if external:
+        results.extend(find_relevant_articles(req.topic.strip(), sources=external))
+    if has_local:
+        results.extend(find_local_articles(req.topic.strip()))
+
+    _auto_save_articles(results)
 
     return ArticleSearchResponse(
         topic=req.topic,

@@ -10,7 +10,7 @@ export default function Dashboard() {
     { id: "local", label: "Local Database" },
   ];
   const [arTopic, setArTopic] = useState("");
-  const [arSource, setArSource] = useState("semantic_scholar");
+  const [arSources, setArSources] = useState(SOURCE_OPTIONS.filter(s => s.id !== "local").map(s => s.id));
   const [arLoading, setArLoading] = useState(false);
   const [arError, setArError] = useState("");
   const [arResults, setArResults] = useState([]);
@@ -22,15 +22,14 @@ export default function Dashboard() {
   const [poolProgress, setPoolProgress] = useState(0);
   const [poolTotal, setPoolTotal] = useState(0);
   const [poolCurrent, setPoolCurrent] = useState("");
+  const [poolContext, setPoolContext] = useState("");
 
   const searchArticles = async (e) => {
     e.preventDefault();
     if (!arTopic.trim()) return;
     setArLoading(true); setArError(""); setArResults([]); setArExpanded({});
     try {
-      const body = arSource === "local"
-        ? { topic: arTopic, sources: ["local"] }
-        : { topic: arTopic, sources: [arSource] };
+      const body = { topic: arTopic, sources: arSources };
       const res = await fetch("/api/articles/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,7 +86,7 @@ export default function Dashboard() {
       const res = await fetch("/api/pooler/pool", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic_fraction: 0.5 }),
+        body: JSON.stringify({ topic_fraction: 0.5, context: poolContext }),
       });
       if (!res.ok) {
         alert("Pooler error: " + (await res.text()));
@@ -150,16 +149,25 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="flex items-center gap-4 mb-2">
-            <select
-              value={arSource}
-              onChange={(e) => setArSource(e.target.value)}
-              className="input-field text-xs w-auto"
-            >
-              {SOURCE_OPTIONS.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <span className="text-xs text-gray-500 font-medium">Sources:</span>
+            {SOURCE_OPTIONS.map(s => (
+              <label key={s.id} className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={arSources.includes(s.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setArSources(prev => [...prev, s.id]);
+                    } else {
+                      setArSources(prev => prev.filter(id => id !== s.id));
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-xs text-gray-600">{s.label}</span>
+              </label>
+            ))}
           </div>
         </form>
 
@@ -168,7 +176,7 @@ export default function Dashboard() {
         {arLoading && (
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
             <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-            Searching {SOURCE_OPTIONS.find(s => s.id === arSource)?.label || arSource}...
+            Searching {arSources.length} source{arSources.length !== 1 ? "s" : ""}: {arSources.map(id => SOURCE_OPTIONS.find(s => s.id === id)?.label).join(", ")}...
           </div>
         )}
 
@@ -225,6 +233,16 @@ export default function Dashboard() {
       </Card>
 
       <Card title="Article Pooler" subtitle="Automatically fetch articles from OpenAlex across 25 research topics to build your training dataset" className="mb-8">
+        <div className="mb-3">
+          <input
+            type="text"
+            value={poolContext}
+            onChange={(e) => setPoolContext(e.target.value)}
+            placeholder="Optional context to refine searches (e.g., 'chemistry' or 'biomedical')"
+            className="input-field text-sm"
+            disabled={poolRunning}
+          />
+        </div>
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={runPooler}

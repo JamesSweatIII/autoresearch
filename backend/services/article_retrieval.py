@@ -57,7 +57,7 @@ def search_semantic_scholar(query: str) -> List[ResearchArticle]:
     try:
         params = {
             "query": query,
-            "limit": "20",
+            "limit": "50",
             "fields": "title,year,authors,venue,citationCount,externalIds,abstract",
         }
         url = f"https://api.semanticscholar.org/graph/v1/paper/search?{urllib.parse.urlencode(params)}"
@@ -86,7 +86,7 @@ def search_semantic_scholar(query: str) -> List[ResearchArticle]:
 def search_openalex(query: str, page: int = 1) -> List[ResearchArticle]:
     articles = []
     try:
-        params = {"search": query, "per-page": "20", "sort": "relevance_score:desc",
+        params = {"search": query, "per-page": "50", "sort": "relevance_score:desc",
                    "select": "id,title,authorships,publication_year,abstract_inverted_index,cited_by_count,doi",
                    "page": str(page)}
         url = f"https://api.openalex.org/works?{urllib.parse.urlencode(params)}"
@@ -128,7 +128,7 @@ def search_openalex(query: str, page: int = 1) -> List[ResearchArticle]:
 def search_arxiv(query: str) -> List[ResearchArticle]:
     articles = []
     try:
-        url = f"http://export.arxiv.org/api/query?{urllib.parse.urlencode({'search_query': f'all:{query}', 'start': '0', 'max_results': '30'})}"
+        url = f"http://export.arxiv.org/api/query?{urllib.parse.urlencode({'search_query': f'all:{query}', 'start': '0', 'max_results': '50'})}"
         resp = _get(url, timeout=20)
         if not resp or resp.status_code != 200:
             return articles
@@ -165,7 +165,7 @@ def search_arxiv(query: str) -> List[ResearchArticle]:
 def search_crossref(query: str) -> List[ResearchArticle]:
     articles = []
     try:
-        params = urllib.parse.urlencode({"query": query, "rows": "30",
+        params = urllib.parse.urlencode({"query": query, "rows": "50",
                                           "select": "DOI,title,author,abstract,container-title,published-print,issued,type"})
         url = f"https://api.crossref.org/works?{params}"
         resp = _get(url)
@@ -268,7 +268,7 @@ def find_relevant_articles(topic: str, sources: Optional[List[str]] = None) -> L
 
     # Rank with LLM
     ranked = _rank_with_llm(deduped, topic)
-    return ranked[:10]
+    return ranked[:50]
 
 
 def _rank_with_llm(articles: List[ResearchArticle], topic: str) -> List[ResearchArticle]:
@@ -307,4 +307,4 @@ def find_local_articles(topic: str) -> List[ResearchArticle]:
     articles = search_local_database(topic, max_results=50)
     articles = _rank_with_llm(articles, topic)
     print(f"[AR] Local DB returned {len(articles)} results")
-    return articles[:10]
+    return articles[:50]

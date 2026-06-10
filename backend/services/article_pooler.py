@@ -32,9 +32,58 @@ BROAD_TOPICS = [
 ]
 
 
-def pool_articles(topics: Optional[List[str]] = None, max_per_topic: int = 50, topic_fraction: float = 0.5) -> dict:
+def pool_articles(topics: Optional[List[str]] = None, max_per_topic: int = 50, topic_fraction: float = 0.5, context: str = "") -> dict:
     from database.setup import SessionLocal, Paper
     from services.article_retrieval import search_openalex
+
+    total_new = 0
+    total_dup = 0
+    searched = []
+
+    if context:
+        _pooler_state["current_topic"] = context
+        print(f"[Pooler] Searching with context: {context}")
+        articles = search_openalex(context, page=1)
+        if articles:
+            sample_size = min(len(articles), max_per_topic)
+            random_articles = random.sample(articles, sample_size)
+            db = SessionLocal()
+            try:
+                saved = 0
+                dup = 0
+                for a in random_articles:
+                    if not a.title or not a.abstract:
+                        continue
+                    existing = db.query(Paper).filter(Paper.title.ilike(a.title.strip())).first()
+                    if existing:
+                        dup += 1
+                        continue
+                    db.add(Paper(
+                        title=a.title.strip(), authors=", ".join(a.authors),
+                        year=a.year or 2024, abstract=a.abstract,
+                        source=a.source or "openalex", url=a.url or "",
+                        source_type="pooled",
+                    ))
+                    saved += 1
+                db.commit()
+                total_new += saved
+                total_dup += dup
+                print(f"[Pooler] Context '{context}': {saved} new, {dup} dup")
+            except Exception as e:
+                db.rollback()
+                print(f"[Pooler] Error saving context '{context}': {e}")
+            finally:
+                db.close()
+            searched.append({"topic": context, "found": len(articles), "new": saved})
+        else:
+            searched.append({"topic": context, "found": 0, "new": 0})
+        _pooler_state["progress"] = 1
+        return {
+            "new_articles": total_new,
+            "duplicates_skipped": total_dup,
+            "topics_searched": len(searched),
+            "details": searched,
+        }
 
     if topics is None:
         topics = list(BROAD_TOPICS)
@@ -44,10 +93,6 @@ def pool_articles(topics: Optional[List[str]] = None, max_per_topic: int = 50, t
     if topic_fraction < 1.0:
         n = max(1, int(len(topic_order) * topic_fraction))
         topic_order = random.sample(topic_order, n)
-
-    total_new = 0
-    total_dup = 0
-    searched = []
 
     for topic in topic_order:
         _pooler_state["current_topic"] = topic
@@ -120,7 +165,7 @@ _pooler_state = {
 _pooler_thread = None
 
 
-def start_pooler(topics: Optional[List[str]] = None, max_per_topic: int = 50, topic_fraction: float = 0.5):
+def start_pooler(topics: Optional[List[str]] = None, max_per_topic: int = 50, topic_fraction: float = 0.5, context: str = ""):
     global _pooler_thread, _pooler_state
 
     if _pooler_state["running"]:
@@ -138,12 +183,13 @@ def start_pooler(topics: Optional[List[str]] = None, max_per_topic: int = 50, to
         "topics": topic_list,
         "max_per_topic": max_per_topic,
         "topic_fraction": topic_fraction,
+        "context": context,
     }
 
     def _run():
         try:
             _pooler_state["status"] = "running"
-            result = pool_articles(topics=_pooler_state["topics"], max_per_topic=_pooler_state["max_per_topic"], topic_fraction=_pooler_state["topic_fraction"])
+            result = pool_articles(topics=_pooler_state["topics"], max_per_topic=_pooler_state["max_per_topic"], topic_fraction=_pooler_state["topic_fraction"], context=_pooler_state["context"])
             _pooler_state["result"] = result
             _pooler_state["status"] = "complete"
             _pooler_state["progress"] = _pooler_state["total_topics"]

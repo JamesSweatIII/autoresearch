@@ -1,0 +1,5 @@
+Autoresearch experiment log — relevance model (agent appends here).
+
+Format: experiment #, what changed, old->new accuracy, KEPT/REVERTED, note.
+
+#0  baseline (linear, lr=0.002, epochs=1)  acc=0.6740  KEPT  starting point (below 0.90 gate; agent to optimize)

@@ -41,7 +41,11 @@ def list_papers(
                 | Paper.authors.ilike(f"%{search}%")
             )
         if source:
-            q = q.filter(Paper.source == source)
+            sources = [s.strip() for s in source.split(",") if s.strip()]
+            if len(sources) == 1:
+                q = q.filter(Paper.source == sources[0])
+            elif len(sources) > 1:
+                q = q.filter(Paper.source.in_(sources))
         if source_type:
             q = q.filter(Paper.source_type == source_type)
         total = q.count()
