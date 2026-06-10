@@ -27,8 +27,13 @@ function getSourceColor(source) {
 
 function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, children }) {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [groupSearch, setGroupSearch] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(groupSearch.toLowerCase())
+  );
 
   async function handleCreateAndAdd() {
     if (!newGroupName.trim()) return;
@@ -48,6 +53,7 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
         });
         if (onAddToGroup) onAddToGroup(g.id, p.id);
         setNewGroupName("");
+        setGroupSearch("");
         setShowGroupPicker(false);
       }
     } catch {}
@@ -103,10 +109,18 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
               </button>
             )}
             {showGroupPicker && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2" onClick={e => e.stopPropagation()}>
+              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2" onClick={e => e.stopPropagation()}>
                 <p className="text-xs font-medium text-gray-600 mb-1.5 px-1">Add to group</p>
+                <input
+                  type="text"
+                  value={groupSearch}
+                  onChange={e => { setGroupSearch(e.target.value); setNewGroupName(e.target.value); }}
+                  placeholder="Search groups or create new..."
+                  className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded mb-1.5"
+                  autoFocus
+                />
                 <div className="max-h-40 overflow-y-auto space-y-0.5">
-                  {groups.map(g => {
+                  {filteredGroups.length > 0 ? filteredGroups.map(g => {
                     const inGroup = g.paper_ids?.has?.(p.id) || g.paper_ids?.includes?.(p.id);
                     return (
                       <button
@@ -122,6 +136,7 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
                             });
                           }
                           if (onAddToGroup) onAddToGroup(g.id, p.id);
+                          setGroupSearch("");
                           setShowGroupPicker(false);
                         }}
                         className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100 flex items-center gap-2 ${
@@ -134,24 +149,24 @@ function PaperCard({ p, showSave, onToggleSave, saving, onAddToGroup, groups, ch
                         {g.name}
                       </button>
                     );
-                  })}
+                  }) : (
+                    <p className="text-xs text-gray-400 px-2 py-2 text-center">No groups match &quot;{groupSearch}&quot;</p>
+                  )}
                 </div>
-                <div className="border-t border-gray-100 mt-1.5 pt-1.5">
-                  <input
-                    type="text"
-                    value={newGroupName}
-                    onChange={e => setNewGroupName(e.target.value)}
-                    placeholder="New group name..."
-                    className="w-full text-xs px-2 py-1 border border-gray-200 rounded mb-1"
-                  />
-                  <button
-                    onClick={handleCreateAndAdd}
-                    disabled={creating || !newGroupName.trim()}
-                    className="w-full text-xs px-2 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    {creating ? "Creating..." : "Create & Add"}
-                  </button>
-                </div>
+                {groupSearch && !filteredGroups.some(g => g.name.toLowerCase() === groupSearch.toLowerCase()) && (
+                  <div className="border-t border-gray-100 mt-1.5 pt-1.5">
+                    <button
+                      onClick={handleCreateAndAdd}
+                      disabled={creating || !newGroupName.trim()}
+                      className="w-full text-xs px-2 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {creating ? "Creating..." : `Create "${newGroupName}" & add`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
