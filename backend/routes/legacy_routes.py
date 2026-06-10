@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
+from pydantic import BaseModel
 from database.setup import SessionLocal, Paper
 
 router = APIRouter(tags=["legacy"])
@@ -29,7 +30,8 @@ def get_stats():
 
 @router.get("/api/papers")
 def list_papers(
-    search: str = "", source: str = "", source_type: str = "", limit: int = 20, offset: int = 0
+    search: str = "", source: str = "", source_type: str = "",
+    saved: str = "", limit: int = 20, offset: int = 0
 ):
     db = SessionLocal()
     try:
@@ -48,6 +50,10 @@ def list_papers(
                 q = q.filter(Paper.source.in_(sources))
         if source_type:
             q = q.filter(Paper.source_type == source_type)
+        if saved == "true":
+            q = q.filter(Paper.saved == 1)
+        elif saved == "false":
+            q = q.filter(Paper.saved == 0)
         total = q.count()
         rows = q.order_by(Paper.id.desc()).offset(offset).limit(limit).all()
         def format_url(url, source_type, source):
@@ -70,6 +76,7 @@ def list_papers(
                 "keywords": p.keywords or [],
                 "url": format_url(p.url, p.source_type, p.source),
                 "source_type": p.source_type,
+                "saved": bool(p.saved),
             }
             for p in rows
         ]
@@ -139,5 +146,23 @@ def get_paper(paper_id: int):
                 for p in similar
             ],
         }
+    finally:
+        db.close()
+
+
+class SaveToggle(BaseModel):
+    saved: bool
+
+
+@router.patch("/api/papers/{paper_id}/save")
+def toggle_saved(paper_id: int, body: SaveToggle):
+    db = SessionLocal()
+    try:
+        paper = db.query(Paper).filter(Paper.id == paper_id).first()
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
+        paper.saved = 1 if body.saved else 0
+        db.commit()
+        return {"id": paper.id, "saved": body.saved}
     finally:
         db.close()

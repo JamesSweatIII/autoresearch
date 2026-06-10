@@ -83,6 +83,7 @@ class Paper(Base):
     url = Column(String(500), default="")
     source_type = Column(String(50), default="web")
     discovered_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    saved = Column(Integer, default=0)
 
 
 def init_db():
@@ -118,6 +119,15 @@ def _migrate_old_schema():
                 conn.execute(sql_text("ALTER TABLE documents ADD COLUMN llm_verified INTEGER DEFAULT 0"))
                 conn.commit()
             print("[AutoResearch] Added llm_verified column to documents")
+    except Exception:
+        pass
+    try:
+        columns = [c["name"] for c in inspector.get_columns("papers")]
+        if "saved" not in columns:
+            with engine.connect() as conn:
+                conn.execute(sql_text("ALTER TABLE papers ADD COLUMN saved INTEGER DEFAULT 0"))
+                conn.commit()
+            print("[AutoResearch] Added saved column to papers")
     except Exception:
         pass
 

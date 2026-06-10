@@ -36,8 +36,10 @@ export default function KnowledgeBase() {
   ];
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState([]);
+  const [savedOnly, setSavedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [stats, setStats] = useState(null);
+  const [saving, setSaving] = useState({});
   const limit = 20;
 
   useEffect(() => {
@@ -50,13 +52,14 @@ export default function KnowledgeBase() {
   useEffect(() => {
     setLoading(true);
     setPage(1);
-  }, [search, sourceFilter]);
+  }, [search, sourceFilter, savedOnly]);
 
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (sourceFilter.length > 0) params.set("source", sourceFilter.join(","));
+    if (savedOnly) params.set("saved", "true");
     params.set("limit", String(limit));
     params.set("offset", String((page - 1) * limit));
 
@@ -68,6 +71,23 @@ export default function KnowledgeBase() {
     }, [search, sourceFilter, page]);
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
+
+  async function toggleSaved(p) {
+    const newVal = !p.saved;
+    setSaving(prev => ({ ...prev, [p.id]: true }));
+    try {
+      const res = await fetch(`/api/papers/${p.id}/save`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saved: newVal }),
+      });
+      if (res.ok) {
+        p.saved = newVal;
+        setData(prev => ({ ...prev }));
+      }
+    } catch {}
+    setSaving(prev => ({ ...prev, [p.id]: false }));
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -127,6 +147,20 @@ export default function KnowledgeBase() {
                 </button>
               );
             })}
+            <span className="w-px h-5 bg-gray-200 mx-1" />
+            <button
+              onClick={() => setSavedOnly(prev => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                savedOnly
+                  ? 'bg-yellow-100 text-yellow-700 ring-2 ring-offset-1 ring-yellow-400'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill={savedOnly ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              Saved
+            </button>
           </div>
         </div>
       </Card>
@@ -141,7 +175,7 @@ export default function KnowledgeBase() {
       ) : data && data.papers ? (
         <>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">{data.total} papers found</p>
+            <p className="text-sm text-gray-500">{data.total} {savedOnly ? "saved " : ""}papers found</p>
             {totalPages > 1 && (
               <div className="flex items-center gap-2 text-sm">
                 <button
@@ -166,9 +200,9 @@ export default function KnowledgeBase() {
           </div>
           <div className="space-y-3">
             {data.papers.map((p) => (
-              <Link key={p.id} href={`/papers/${p.id}`} className="block card hover:shadow-md transition-shadow cursor-pointer">
+              <div key={p.id} className="card hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/papers/${p.id}`} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {(() => {
                         const c = getSourceColor(p.source || p.source_type);
@@ -196,8 +230,21 @@ export default function KnowledgeBase() {
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div className="flex flex-col items-center gap-1 shrink-0">
+                  </Link>
+                  <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleSaved(p); }}
+                      disabled={saving[p.id]}
+                      className={`p-1.5 rounded transition-colors ${
+                        p.saved
+                          ? 'text-yellow-500 hover:text-yellow-600'
+                          : 'text-gray-300 hover:text-yellow-400'
+                      } disabled:opacity-50`}
+                    >
+                      <svg className="w-4 h-4" fill={p.saved ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      </svg>
+                    </button>
                     {p.url && (
                       <a
                         href={p.url}
@@ -213,7 +260,7 @@ export default function KnowledgeBase() {
                     )}
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </>
