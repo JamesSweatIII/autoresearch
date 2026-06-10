@@ -70,6 +70,22 @@ class Document(Base):
     llm_verified = Column(Integer, default=0)
 
 
+class ResearchGroup(Base):
+    __tablename__ = "research_groups"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(500), nullable=False)
+    description = Column(Text, default="")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class PaperGroup(Base):
+    __tablename__ = "paper_groups"
+    id = Column(Integer, primary_key=True, index=True)
+    paper_id = Column(Integer, nullable=False)
+    group_id = Column(Integer, nullable=False)
+    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Paper(Base):
     __tablename__ = "papers"
     id = Column(Integer, primary_key=True, index=True)
@@ -89,7 +105,13 @@ class Paper(Base):
 def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_old_schema()
+    _migrate_new_tables()
     _seed_sample_papers()
+
+
+def _migrate_new_tables():
+    ResearchGroup.__table__.create(bind=engine, checkfirst=True)
+    PaperGroup.__table__.create(bind=engine, checkfirst=True)
 
 
 def _migrate_old_schema():
