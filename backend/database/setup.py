@@ -9,18 +9,25 @@ from sqlalchemy import inspect, text as sql_text
 
 SAMPLE_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "sample_documents.json.bak"
 
+_default_db_dir = Path(__file__).resolve().parent.parent.parent / "data"
+_default_db_dir.mkdir(parents=True, exist_ok=True)
+_default_db_url = f"sqlite:///{_default_db_dir / 'autoresearch.db'}"
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("sqlite"):
+    try:
+        from sqlalchemy.engine.url import make_url
+        parsed = make_url(DATABASE_URL)
+        db_path = parsed.database
+        if db_path and db_path != ":memory:":
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        DATABASE_URL = None
+
 if not DATABASE_URL:
-    db_dir = Path(__file__).resolve().parent.parent.parent / "data"
-    db_dir.mkdir(parents=True, exist_ok=True)
-    DB_PATH = db_dir / "autoresearch.db"
-    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    DATABASE_URL = _default_db_url
 
 if DATABASE_URL.startswith("sqlite"):
-    db_path_str = DATABASE_URL.replace("sqlite:///", "", 1)
-    if db_path_str:
-        db_dir = Path(db_path_str).parent
-        db_dir.mkdir(parents=True, exist_ok=True)
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     engine = create_engine(
