@@ -7,14 +7,20 @@ import json
 from pathlib import Path
 from sqlalchemy import inspect, text as sql_text
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
-DB_PATH = DATA_DIR / "autoresearch.db"
-SAMPLE_DATA_PATH = DATA_DIR / "sample_documents.json.bak"
+SAMPLE_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "sample_documents.json.bak"
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    db_dir = Path(__file__).resolve().parent.parent.parent / "data"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    DB_PATH = db_dir / "autoresearch.db"
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
 if DATABASE_URL.startswith("sqlite"):
+    db_path_str = DATABASE_URL.replace("sqlite:///", "", 1)
+    if db_path_str:
+        db_dir = Path(db_path_str).parent
+        db_dir.mkdir(parents=True, exist_ok=True)
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     engine = create_engine(

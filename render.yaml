@@ -10,8 +10,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
-      - key: DATABASE_URL
-        value: sqlite:///data/autoresearch.db
+      # DATABASE_URL is auto-configured in the code.
+      # Set via Render Dashboard if using Postgres.
 
   - type: web
     name: autoresearch-frontend
