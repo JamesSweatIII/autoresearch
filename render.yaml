@@ -7,11 +7,16 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
-      # DATABASE_URL is auto-configured in the code.
-      # Set via Render Dashboard if using Postgres.
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_POOL_SIZE
+        value: 10
+      - key: DB_MAX_OVERFLOW
+        value: 20
 
   - type: web
     name: autoresearch-frontend
