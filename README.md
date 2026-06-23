@@ -3,6 +3,8 @@
 An end-to-end platform that gathers, analyzes, and trains relevance models on
 academic research papers. Built with FastAPI, Next.js 14, PyTorch, and Tailwind CSS.
 
+**Live demo:** [https://autoresearch-frontend.onrender.com](https://autoresearch-frontend.onrender.com)
+
 ## Quick Start
 
 ### Backend
@@ -10,6 +12,10 @@ academic research papers. Built with FastAPI, Next.js 14, PyTorch, and Tailwind 
 ```bash
 cd backend
 pip install -r requirements.txt
+
+# Database (defaults to SQLite for local dev; optional)
+cp .env.example .env   # or set DATABASE_URL for Postgres
+
 python main.py
 ```
 
@@ -30,7 +36,7 @@ App runs at `http://localhost:3000`.
 ```
 User → Dashboard (Next.js) → API (FastAPI) → Article Retrieval (4 sources)
          ↓                        ↓                    ↓
-      Results ←──── SQLite Database ←─── Semantic Ranking + Sentiment
+      Results ←── PostgreSQL (Neon) ←── Semantic Ranking + Sentiment
          ↓                        ↓
    Research Groups          Autoresearch Torch Model
    (organize papers)        (gated at ≥85% accuracy)
@@ -48,11 +54,12 @@ User → Dashboard (Next.js) → API (FastAPI) → Article Retrieval (4 sources)
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | FastAPI, SQLAlchemy, SQLite |
+| Backend | FastAPI, SQLAlchemy, PostgreSQL (Neon) / SQLite |
 | Search | Semantic Scholar, OpenAlex, arXiv, CrossRef APIs |
 | ML | PyTorch 2.1+, SentenceTransformers, scikit-learn |
 | NLP | NLTK, TextBlob, Bing Liu sentiment lexicon |
 | Frontend | Next.js 14, Tailwind CSS, Recharts |
+| Hosting | Render (backend + frontend), Neon (PostgreSQL) |
 | Agent | OpenCode (AI coding CLI via OpenRouter) |
 
 ## API Endpoints
@@ -112,10 +119,11 @@ autoresearch/
 │   ├── plot.py                  # Accuracy progress curve
 │   └── AGENT_INSTRUCTIONS.md    # Keep/discard loop for OpenCode
 ├── data/
-│   ├── autoresearch.db          # SQLite database
 │   ├── sample_documents.json.bak  # Sample papers (50 AI/ML papers)
 │   ├── relevance_model.pkl      # sklearn relevance model
 │   └── salex_bing.csv           # Bing Liu sentiment lexicon
+├── render.yaml                  # Render Blueprint deployment config
+├── .env.example                 # Environment variables template
 ├── DEMO.md
 ├── FINAL_REPORT.md
 ├── PLAN.md
@@ -155,6 +163,12 @@ that optimizes a PyTorch relevance model. An AI agent (OpenCode):
 
 The model is exposed through a **gated** API — interaction unlocks only once
 accuracy reaches ≥85%. Best achieved: **91.9%** held-out accuracy.
+
+## Deployment
+
+The project deploys on **Render** via `render.yaml` (Blueprint). The backend auto-detects
+`DATABASE_URL` — on production it connects to **Neon PostgreSQL**; locally it falls back
+to SQLite. See [DEPLOY.md](DEPLOY.md) for AWS-based deployment.
 
 ## Sample Dataset
 

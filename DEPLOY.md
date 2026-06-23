@@ -1,6 +1,19 @@
-# AutoResearch — Multi-Server Deployment with SQS
+# AutoResearch — Deployment
 
-## Architecture
+## Render (current production)
+
+The project deploys via `render.yaml` (Blueprint) at the repo root:
+
+- **Backend** — FastAPI on Render Web Service, connects to Neon PostgreSQL
+- **Frontend** — Next.js on Render Web Service
+
+Set `DATABASE_URL` to your Neon connection string in the Render Dashboard.
+
+---
+
+## AWS Multi-Server Deployment with SQS (alternative)
+
+Architecture:
 
 ```
                           ┌──────────────┐
@@ -14,7 +27,13 @@ User ──→ ALB ──→ API (FastAPI) ──→ SQS Queue ──→ EC2 Wor
 
 ## Step 1: Create Shared Resources
 
-### 1a. RDS PostgreSQL (replace SQLite)
+### 1a. PostgreSQL Database
+
+**Option A — Neon (serverless, free tier):**
+
+Create a free project at [neon.tech](https://neon.tech), copy the connection string, and set it as `DATABASE_URL`.
+
+**Option B — AWS RDS:**
 
 ```bash
 aws rds create-db-instance \
@@ -150,8 +169,8 @@ cd ~/autoresearch/backend && source venv/bin/activate && \
 ## Environment Variables Reference
 
 | Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | No | `sqlite:///data/autoresearch.db` | PostgreSQL URL for production |
+|---|---|---|---|---|
+| `DATABASE_URL` | No | `sqlite:///<project-root>/data/autoresearch.db` | PostgreSQL URL for production (Neon/RDS) |
 | `SQS_QUEUE_URL` | No | `""` | SQS queue URL (empty = no worker mode) |
 | `AWS_REGION` | No | `us-east-1` | AWS region |
 | `WORKER_POLL_INTERVAL` | No | `5` | SQS long-poll wait time (seconds) |
