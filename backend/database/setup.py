@@ -116,10 +116,29 @@ class Paper(Base):
 
 
 def init_db():
+    _wait_for_db()
     Base.metadata.create_all(bind=engine)
     _migrate_old_schema()
     _migrate_new_tables()
     _seed_sample_papers()
+
+
+def _wait_for_db(max_retries=10, delay=2):
+    if DATABASE_URL.startswith("sqlite"):
+        return
+    from sqlalchemy import text
+    for attempt in range(1, max_retries + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print("[AutoResearch] Database connected")
+            return
+        except Exception as e:
+            print(f"[AutoResearch] DB connection attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                import time
+                time.sleep(delay)
+    print("[AutoResearch] WARNING: Could not connect to database after retries")
 
 
 def _migrate_new_tables():
